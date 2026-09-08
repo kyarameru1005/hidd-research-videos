@@ -25,25 +25,10 @@
   var reduceMotion = window.matchMedia &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
-  function smoothstep(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
-  function easeInOutCubic(t) { return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2; }
-  function shortestAngle(from, to) {
-    var d = (to - from) % TAU;
-    if (d > Math.PI) d -= TAU;
-    if (d < -Math.PI) d += TAU;
-    return d;
-  }
-  function facingAngles(d) {
-    return { pitch: Math.asin(clamp(d[1], -1, 1)), yaw: Math.atan2(-d[0], d[2]) };
-  }
-  function hasWebGL() {
-    try {
-      var c = document.createElement('canvas');
-      return !!(window.WebGLRenderingContext &&
-        (c.getContext('webgl') || c.getContext('experimental-webgl')));
-    } catch (e) { return false; }
-  }
+  /* 回転まわりの計算は ../src/js/geometry.js に集約している */
+  var G = window.HIDDGeom;
+  var clamp = G.clamp, smoothstep = G.smoothstep, easeInOutCubic = G.easeInOutCubic,
+      shortestAngle = G.shortestAngle, facingAngles = G.facingAngles, hasWebGL = G.hasWebGL;
 
   /* 再現性のある擬似乱数（読み込むたびに星の配置が変わらないように） */
   function seeded(seed) {

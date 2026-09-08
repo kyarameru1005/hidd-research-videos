@@ -15,6 +15,15 @@ python3 serve.py
 `src/index.html` をダブルクリックしても動きます（ビルド工程はありません）。
 ただしローカル動画を扱う場合は `serve.py` を使ってください（理由は [docs/operations.md](docs/operations.md)）。
 
+## テスト
+
+```sh
+node --test test/*.test.js
+```
+
+Node 標準のテストランナーだけで動きます（npm 不要）。
+データの整合性、回転の計算、構成の決まりごと（`file://` で開けるか、外部依存が混じっていないか）を検査します。
+
 ## ディレクトリ
 
 ```
@@ -22,7 +31,7 @@ src/                本番サイト（これ単体で完結して動く）
   index.html          トップ（入場アニメーション + 球体）
   category.html       カテゴリ詳細（?cat=<id> で共通描画）
   css/                common / index / category
-  js/                 data.js（内容の編集はここだけ）/ sphere / intro / category / texture-lab
+  js/                 data.js（内容の編集はここだけ）/ geometry / sphere / intro / category / texture-lab
   vendor/             Three.js r149（UMD 版・同梱）
   videos/             動画ファイル（実物は Git 管理外。sample のみ追跡）
 
@@ -38,6 +47,7 @@ docs/               ドキュメント
   operations.md       動かし方、動画の用意、展示運用
   decisions.md        設計判断と落とし穴の記録
 
+test/               テスト（node --test test/*.test.js）
 serve.py            簡易サーバー（Range 対応）
 CLAUDE.md           このリポジトリでの作業指示
 ```

@@ -23,49 +23,10 @@
 
   /* ---------------- ユーティリティ ---------------- */
 
-  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
-
-  /**
-   * 単位ベクトル d を正面（+Z）に持ってくる yaw / pitch を求める。
-   *
-   * 球の回転は R = Rx(pitch) * Ry(yaw)（Three.js 既定の 'XYZ'）。
-   * これで正面に来る向きは d = (-cos(pitch)·sin(yaw), sin(pitch), cos(pitch)·cos(yaw)) なので、
-   * 逆に解くと pitch = asin(dy), yaw = atan2(-dx, dz)。
-   * pitch は必ず ±90 度以内に収まるため、クランプに引っかからない。
-   */
-  function facingAngles(d) {
-    return {
-      pitch: Math.asin(clamp(d[1], -1, 1)),
-      yaw: Math.atan2(-d[0], d[2])
-    };
-  }
-
-  function smoothstep(a, b, x) {
-    var t = clamp((x - a) / (b - a), 0, 1);
-    return t * t * (3 - 2 * t);
-  }
-
-  function easeInOutCubic(t) {
-    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
-  }
-
-  /* 角度差を -PI..PI に畳んで最短経路にする */
-  function shortestAngle(from, to) {
-    var d = (to - from) % TAU;
-    if (d > Math.PI) d -= TAU;
-    if (d < -Math.PI) d += TAU;
-    return d;
-  }
-
-  function hasWebGL() {
-    try {
-      var c = document.createElement('canvas');
-      return !!(window.WebGLRenderingContext &&
-        (c.getContext('webgl') || c.getContext('experimental-webgl')));
-    } catch (e) {
-      return false;
-    }
-  }
+  /* 回転まわりの計算は js/geometry.js に集約している */
+  var G = window.HIDDGeom;
+  var clamp = G.clamp, smoothstep = G.smoothstep, easeInOutCubic = G.easeInOutCubic,
+      shortestAngle = G.shortestAngle, facingAngles = G.facingAngles, hasWebGL = G.hasWebGL;
 
   /* ---------------- フォールバック / キーボード用ナビ ---------------- */
 
@@ -197,7 +158,7 @@
     var tour = null;                // 進行中の 1 区間
     var tourStep = 0;
 
-    var snap = null;               // { fromYaw, fromPitch, dYaw, dPitch, start, dur, onDone }
+    var snap = null;               // { fromYaw, fromPitch, dYaw, dPitch, start, dur }
     var intro = null;              // { start, dur }
 
     var running = false;

@@ -69,6 +69,25 @@ GitHub は 1 ファイル 100MB が上限。`src/videos/` は `.gitignore` 済�
 
 ## 動作確認
 
+### テスト（変更したら必ず実行する）
+
+```sh
+node --test test/*.test.js
+```
+
+npm は使わない。Node 標準のテストランナーだけで動く。
+
+- `test/data.test.js` — `src/js/data.js` の整合性
+- `test/geometry.test.js` — 回転の計算（カテゴリが正面に来ること）
+- `test/structure.test.js` — **このファイルに書いた制約の自動検査**
+
+`structure.test.js` が落ちたときは、たいてい `file://` で開けなくなっているか、
+過去に踏んだ不具合を踏み直している。メッセージに理由が書いてある。
+
+**DOM に依存しないロジックは `src/js/geometry.js` に置く。** ここに置けばテストできる。
+
+### ブラウザでの確認
+
 ```sh
 python3 serve.py        # /src/ が本番、/demo/ がデモ
 ```
