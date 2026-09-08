@@ -119,26 +119,6 @@
     var sphere = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 32), sphereMat);
     group.add(sphere);
 
-    /* 赤道と経線のリング（「球」であることを分かりやすくする） */
-    var ringMat = new THREE.LineBasicMaterial({
-      color: 0xbfe4ff, transparent: true, opacity: 0.34
-    });
-    function ring(rotX, rotY) {
-      var pts = [];
-      var SEG = 96;
-      for (var i = 0; i <= SEG; i++) {
-        var a = (i / SEG) * TAU;
-        pts.push(new THREE.Vector3(Math.cos(a) * 1.012, Math.sin(a) * 1.012, 0));
-      }
-      var line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), ringMat);
-      line.rotation.x = rotX;
-      line.rotation.y = rotY;
-      return line;
-    }
-    group.add(ring(HALF_PI, 0));  // 赤道
-    group.add(ring(0, 0));        // 経線 1
-    group.add(ring(0, HALF_PI));  // 経線 2
-
     /* カテゴリ位置のマーカー（球面上の点） */
     var markerPos = [];
     var markerCol = [];
@@ -321,7 +301,6 @@
       group.rotation.set(pitch, yaw, 0);   // 既定の 'XYZ' = Rx * Ry
       group.scale.setScalar(introScale);
       sphereMat.uniforms.uFade.value = introOpacity;
-      ringMat.opacity = 0.34 * introOpacity;
       markers.material.opacity = 0.95 * introOpacity;
 
       group.updateMatrixWorld(true);
