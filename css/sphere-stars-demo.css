@@ -61,6 +61,11 @@
   min-height: 1.4em; text-align: center;
 }
 .sd-status b { color: var(--fg-mute); font-weight: 700; }
+.sd-link {
+  margin-left: 10px; color: var(--fg-mute);
+  border-bottom: 1px solid currentColor; padding-bottom: 1px;
+}
+.sd-link:hover { color: #fff; }
 .sd-status.is-live { color: var(--accent-ai); }
 
 .sphere-wrap {
@@ -97,7 +102,7 @@
 
 .star {
   position: absolute; top: 0; left: 0;
-  width: 10px; height: 10px; margin: -5px 0 0 -5px;
+  width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px;
   pointer-events: auto; cursor: pointer;
   will-change: transform, opacity;
 }
@@ -120,15 +125,65 @@
 .star.is-picked::after { transform: scale(2.1); opacity: 1; }
 .star.is-back { pointer-events: none; }
 
+/* ---------------- 1 等星（カテゴリ選択ボタン） ---------------- */
+
+.star--major {
+  width: 20px; height: 20px; margin: -10px 0 0 -10px;
+  z-index: 210;
+}
+.star--major::before { inset: 6px; box-shadow: 0 0 10px 2px #fff; }
+.star--major::after  { inset: -16px; opacity: .95; }
+
+/* 光条（明るい星のにじみ） */
+.star__spikes {
+  position: absolute; inset: -20px;
+  pointer-events: none; opacity: .85;
+  background:
+    linear-gradient(to right, transparent 0%, var(--star) 50%, transparent 100%) center / 100% 1.5px no-repeat,
+    linear-gradient(to bottom, transparent 0%, var(--star) 50%, transparent 100%) center / 1.5px 100% no-repeat;
+}
+.star--major:hover .star__spikes { opacity: 1; transform: scale(1.25); }
+.star__spikes { transition: transform .25s var(--ease), opacity .25s var(--ease); }
+
+/* カテゴリ名（1 等星が正面を向いたときだけ出る） */
+.star__name {
+  position: absolute; left: 50%; top: 22px; transform: translateX(-50%);
+  white-space: nowrap; font-size: 12px; font-weight: 700; letter-spacing: .06em;
+  color: var(--star); text-shadow: 0 0 12px rgba(0,0,0,.95), 0 0 26px rgba(0,0,0,.8);
+  pointer-events: none;
+}
+
+.star--major.is-focused::after { transform: scale(1.5); opacity: 1; }
+.star--major.is-focused .star__spikes { transform: scale(1.5); opacity: 1; }
+.star__name { z-index: 5; }
+.star--major.is-focused .star__name {
+  background: rgba(8,10,20,.9); border: 1px solid var(--star);
+  padding: 4px 12px; border-radius: 999px; top: 30px;
+  font-size: 12.5px;
+}
+
+/* 選択していないカテゴリは控えめにする */
+.star.is-dim { filter: saturate(.35) brightness(.55); }
+.star.is-dim .star__name { opacity: 0 !important; }
+
+/* 選択中カテゴリの動画の星は大きく、タイトルを出す */
+.star.is-focused:not(.star--major) { width: 14px; height: 14px; margin: -7px 0 0 -7px; }
+.star.is-focused:not(.star--major)::after { inset: -10px; opacity: 1; }
+.star.is-focused .star__tip { opacity: 1; }
+
 /* 星に添えるタイトル（正面付近だけ出る） */
 .star__tip {
-  position: absolute; left: 50%; top: 14px; transform: translateX(-50%);
-  white-space: nowrap; font-size: 11px; font-weight: 700; color: #fff;
+  position: absolute; left: 50%; top: 15px; transform: translateX(-50%);
+  white-space: nowrap; font-size: 10.5px; font-weight: 700; color: #fff;
   background: rgba(8, 10, 20, .82); border: 1px solid var(--star);
   padding: 3px 9px; border-radius: 999px;
   opacity: 0; transition: opacity .18s var(--ease);
   pointer-events: none;
 }
+.star__tip--below { top: 15px; bottom: auto; left: 50%; right: auto; transform: translateX(-50%); }
+.star__tip--above { top: auto; bottom: 15px; left: 50%; right: auto; transform: translateX(-50%); }
+.star__tip--right { top: 50%; bottom: auto; left: 16px; right: auto; transform: translateY(-50%); }
+.star__tip--left  { top: 50%; bottom: auto; left: auto; right: 16px; transform: translateY(-50%); }
 .star:hover .star__tip { opacity: 1; }
 
 /* ---------------- HIDD とカテゴリ名 ---------------- */
@@ -139,12 +194,6 @@
   font-size: clamp(22px, 5vmin, 44px); color: #fff;
   text-shadow: 0 0 20px rgba(120,190,255,.5), 0 0 52px rgba(90,200,250,.22);
   will-change: transform, opacity; pointer-events: none;
-}
-.cat-name {
-  position: absolute; top: 0; left: 0;
-  font-size: 12px; font-weight: 700; letter-spacing: .08em;
-  color: var(--cat); text-shadow: 0 0 14px rgba(0,0,0,.9);
-  white-space: nowrap; will-change: transform, opacity; pointer-events: none;
 }
 
 /* ---------------- 星から生えるカード ---------------- */

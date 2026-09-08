@@ -19,6 +19,7 @@
   var LABEL_R = 1.16;
   var BRAND_R = 1.02;
   var STAR_R = 1.04;
+  var MAJOR_R = 1.05;
   var STORE = 'hidd.demo.pos.';
 
   var reduceMotion = window.matchMedia &&
@@ -80,8 +81,10 @@
     var d = DATA.direction(ci);
     var n = cat.videos.length;
     cat.videos.forEach(function (video, vi) {
-      var theta = (15 + rnd() * 16) * Math.PI / 180;      /* 中心から 15〜31 度 */
-      var phi = (vi / n) * TAU + rnd() * 0.9;
+      /* 中心から 26〜38 度。カテゴリ同士は 90 度離れているので、
+         38 度までなら隣の星座と混ざらない（90 - 38*2 = 14 度の間隔が残る）。 */
+      var theta = (26 + rnd() * 12) * Math.PI / 180;
+      var phi = (vi / n) * TAU + ci * 0.6;                 /* 4 本を 90 度ずつ均等に */
       ENTRIES.push({
         id: cat.id + '-' + (vi + 1),
         cat: cat,
@@ -163,13 +166,39 @@
 
   addAnchor(overlay.querySelector('[data-anchor="brand"]'), [0, 0, 1], BRAND_R, 'brand');
 
+  /* 1 等星 = カテゴリ。周りの小さな星がそのカテゴリの動画になる */
+  var MAJORS = [];
   DATA.categories.forEach(function (cat, ci) {
     var el = document.createElement('div');
-    el.className = 'cat-name';
-    el.textContent = cat.label;
-    el.style.setProperty('--cat', cat.accent);
+    el.className = 'star star--major is-twinkle';
+    el.style.setProperty('--star', cat.accent);
+    el.style.setProperty('--dur', '4.2s');
+    el.setAttribute('role', 'button');
+    el.setAttribute('aria-label', cat.label + ' を選ぶ');
+
+    var spikes = document.createElement('span');
+    spikes.className = 'star__spikes';
+    el.appendChild(spikes);
+
+    var name = document.createElement('span');
+    name.className = 'star__name';
+    name.textContent = cat.label;
+    el.appendChild(name);
+
     overlay.appendChild(el);
-    addAnchor(el, DATA.direction(ci), LABEL_R, 'cat');
+    var a = addAnchor(el, DATA.direction(ci), MAJOR_R, 'major');
+    a.nameEl = name;
+
+    var major = { cat: cat, ci: ci, el: el, anchor: a };
+    MAJORS.push(major);
+    /* 吹き出しを星座の中心から外向きに出すため、親を覚えさせる */
+    ENTRIES.forEach(function (x) { if (x.catIndex === ci) x.majorAnchor = a; });
+
+    el.addEventListener('click', function (e) {
+      e.stopPropagation();
+      noteActivity();
+      focusCategory(ci);
+    });
   });
 
   ENTRIES.forEach(function (entry) {
@@ -180,7 +209,7 @@
     el.setAttribute('role', 'button');
     el.setAttribute('aria-label', entry.video.title);
     var tip = document.createElement('span');
-    tip.className = 'star__tip';
+    tip.className = 'star__tip star__tip--below';   /* 向きは updateOverlay が決め直す */
     tip.textContent = entry.video.title;
     el.appendChild(tip);
     overlay.appendChild(el);
@@ -194,17 +223,15 @@
     });
   });
 
-  /* 星座線（同じカテゴリの星を順に結ぶ） */
+  /* 星座線: 1 等星から、その周りの動画の星へ放射状に引く（親子関係が見えるように） */
   var LINES = [];
-  DATA.categories.forEach(function (cat, ci) {
-    var mine = ENTRIES.filter(function (x) { return x.catIndex === ci; });
-    for (var i = 0; i < mine.length; i++) {
-      var a = mine[i], b = mine[(i + 1) % mine.length];
+  MAJORS.forEach(function (major) {
+    ENTRIES.filter(function (x) { return x.catIndex === major.ci; }).forEach(function (entry) {
       var ln = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-      ln.setAttribute('stroke', cat.accent);
+      ln.setAttribute('stroke', major.cat.accent);
       svg.appendChild(ln);
-      LINES.push({ el: ln, a: a, b: b });
-    }
+      LINES.push({ el: ln, from: major.anchor, to: entry });
+    });
   });
 
   /* ---------------- 状態 ---------------- */
@@ -220,7 +247,7 @@
   var current = null;            /* 再生中のエントリ */
   var watchdog = null;           /* 再生が進まないときに次へ送る番人 */
   var STALL_MS = 12000;          /* これだけ進捗が無ければ次の動画へ */
-  var bag = [];
+  var bag = null;   /* 未再生の動画（シャッフル済み）。null は未初期化 */
 
   var TOUR_RAD_PER_SEC = 0.35;
   var TOUR_STOPS = (function () {
@@ -256,7 +283,7 @@
       a.x = (tmp.x * 0.5 + 0.5) * width;
       a.y = (-tmp.y * 0.5 + 0.5) * height;
 
-      if (a.kind === 'star') {
+      if (a.kind === 'star' || a.kind === 'major') {
         /* 星は手前半球ではしっかり見え、輪郭を回り込んだところで消える */
         a.vis = smoothstep(-0.28, 0.12, depth);
         var sc = 0.7 + 0.6 * ((depth + 1) / 2);
@@ -264,8 +291,24 @@
         a.el.style.opacity = a.vis.toFixed(3);
         a.el.style.zIndex = String(Math.round((depth + 1) * 100));
         a.el.classList.toggle('is-back', a.vis < 0.25);
+        /* カテゴリ名は 1 等星が正面を向いたときだけ出す */
+        if (a.nameEl) a.nameEl.style.opacity = smoothstep(0.45, 0.9, depth).toFixed(3);
+        /* 吹き出しは星座の中心（1 等星）から見て外向きに出す。
+           中央のカテゴリ名や隣の吹き出しと重ならないようにするため。 */
+        if (a.kind === 'star' && a.entry && a.entry.majorAnchor) {
+          var mdx = a.x - a.entry.majorAnchor.x;
+          var mdy = a.y - a.entry.majorAnchor.y;
+          var side = Math.abs(mdx) > Math.abs(mdy)
+            ? (mdx < 0 ? 'left' : 'right')
+            : (mdy < 0 ? 'above' : 'below');
+          if (a.tipSide !== side) {
+            a.tipSide = side;
+            var tip = a.el.firstElementChild;
+            if (tip) tip.className = 'star__tip star__tip--' + side;
+          }
+        }
       } else {
-        /* HIDD とカテゴリ名は正面を向いたときだけ */
+        /* HIDD は正面を向いたときだけ */
         a.vis = smoothstep(0.55, 0.93, depth);
         a.el.style.transform = 'translate3d(' + a.x.toFixed(1) + 'px,' + a.y.toFixed(1) + 'px,0) translate(-50%,-50%)';
         a.el.style.opacity = a.vis.toFixed(3);
@@ -274,7 +317,7 @@
 
     for (var k = 0; k < LINES.length; k++) {
       var L = LINES[k];
-      var pa = L.a.anchor, pb = L.b.anchor;
+      var pa = L.from, pb = L.to.anchor;
       if (!pa || !pb) continue;
       var o = showLines ? Math.min(pa.vis, pb.vis) * 0.75 : 0;
       L.el.setAttribute('x1', pa.x.toFixed(1)); L.el.setAttribute('y1', pa.y.toFixed(1));
@@ -358,6 +401,42 @@
     requestRender();
   }
 
+  /* ---------------- カテゴリの選択（1 等星） ---------------- */
+
+  var focused = -1;
+
+  function focusCategory(ci) {
+    focused = (focused === ci) ? -1 : ci;
+    applyFocus();
+    if (focused >= 0) snapTo(DATA.direction(focused));
+    requestRender();
+  }
+
+  function applyFocus() {
+    MAJORS.forEach(function (m) {
+      m.el.classList.toggle('is-focused', m.ci === focused);
+      m.el.classList.toggle('is-dim', focused >= 0 && m.ci !== focused);
+    });
+    ENTRIES.forEach(function (x) {
+      x.el.classList.toggle('is-focused', x.catIndex === focused);
+      x.el.classList.toggle('is-dim', focused >= 0 && x.catIndex !== focused);
+    });
+    document.getElementById('sphereWrap').classList.toggle('has-focus', focused >= 0);
+    if (focused >= 0) {
+      var cat = DATA.categories[focused];
+      statusEl.classList.add('is-live');
+      statusEl.innerHTML = '<b>' + cat.label + '</b> を選択中 — 周りの星が ' +
+        cat.videos.length + ' 本の動画です（もう一度押すと解除）' +
+        ' <a class="sd-link" href="category.html?cat=' + encodeURIComponent(cat.id) + '">一覧ページを開く →</a>';
+    }
+  }
+
+  function clearFocus() {
+    if (focused < 0) return;
+    focused = -1;
+    applyFocus();
+  }
+
   /* ---------------- 再生 ---------------- */
 
   function shuffled() {
@@ -370,8 +449,15 @@
   }
 
   function nextEntry() {
-    if (!bag.length) bag = shuffled();
+    if (!bag || !bag.length) bag = shuffled();
     return bag.pop();
+  }
+
+  /** 直接クリックで再生した動画も「再生済み」として扱う */
+  function markPlayed(entry) {
+    if (!bag) bag = shuffled();
+    var i = bag.indexOf(entry);
+    if (i >= 0) bag.splice(i, 1);
   }
 
   function savedPos(entry) {
@@ -380,6 +466,8 @@
   }
 
   function pickAndPlay(entry) {
+    clearFocus();
+    markPlayed(entry);
     current = entry;
     ENTRIES.forEach(function (x) { x.el.classList.toggle('is-picked', x === entry); });
     /* 選んだ星を正面へ寄せてから生やす。
@@ -526,7 +614,7 @@
       statusEl.innerHTML = '回転中 — <b>' + (playMs / 1000) + '</b> 秒後にランダムな動画を選びます';
     } else {
       statusEl.classList.add('is-live');
-      var left = bag.length;
+      var left = bag ? bag.length : ENTRIES.length;
       statusEl.innerHTML = '再生中: <b>' + (current ? current.video.title : '') + '</b>（未再生の残り ' + left + ' 本）';
     }
   }
@@ -567,6 +655,7 @@
     dragging = true; pointerId = e.pointerId;
     lastX = e.clientX; lastY = e.clientY; lastT = performance.now();
     velYaw = 0; velPitch = 0; snap = null;
+    clearFocus();
     noteActivity();
     host.classList.add('is-dragging');
     if (host.setPointerCapture) { try { host.setPointerCapture(e.pointerId); } catch (err) {} }
@@ -640,7 +729,7 @@
   });
   document.getElementById('btnReset').addEventListener('click', function () {
     ENTRIES.forEach(function (x) { try { localStorage.removeItem(STORE + x.id); } catch (e) {} });
-    bag = [];
+    bag = null;
     noteActivity();
   });
 
