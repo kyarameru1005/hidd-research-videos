@@ -40,6 +40,11 @@
     };
   }
 
+  function smoothstep(a, b, x) {
+    var t = clamp((x - a) / (b - a), 0, 1);
+    return t * t * (3 - 2 * t);
+  }
+
   function easeInOutCubic(t) {
     return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
   }
@@ -205,9 +210,12 @@
     var lastX = 0, lastY = 0, lastT = 0;
     var userInteracted = false;
 
-    var autoSpin = !reduceMotion;
-    var AUTO_SPIN_SPEED = 0.055;   // rad/s
-    var autoSpinDeadline = 0;      // これを過ぎたら自動回転を止める
+    /* 無操作が続いたときの自動回転（巡回） */
+    var IDLE_MS = 60000;            // これだけ操作がなければ回り始める
+    var TOUR_RAD_PER_SEC = 0.35;    // 巡回の角速度（1 周およそ 30 秒）
+    var idleTimer = null;
+    var tour = null;                // 進行中の 1 区間
+    var tourStep = 0;
 
     var snap = null;               // { fromYaw, fromPitch, dYaw, dPitch, start, dur, onDone }
     var intro = null;              // { start, dur }
@@ -282,8 +290,12 @@
         var hiY = (window.innerHeight - 10) - wrapRect.top - hh;
         if (hiY > loY) y = clamp(y, loY, hiY);
 
-        var scale = 0.86 + 0.14 * ((depth + 1) / 2);
-        var opacity = clamp(0.06 + 0.94 * ((depth + 0.55) / 1.5), 0, 1) * introOpacity;
+        /* 文字はその向きを正面に向けたときだけ見せる。
+           depth は 1 が真正面。約 57 度（0.55）で消え、約 21 度（0.93）で全開。
+           HIDD も同じ扱いなので、球体を回すと文字が球面から消えていく。 */
+        var vis = smoothstep(0.55, 0.93, depth);
+        var scale = 0.90 + 0.10 * ((depth + 1) / 2);
+        var opacity = vis * introOpacity;
 
         a.el.style.transform =
           'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0)' +
@@ -292,8 +304,9 @@
         a.el.style.zIndex = String(Math.round((depth + 1) * 100));
 
         if (a.category) {
-          a.el.classList.toggle('is-back', depth < -0.15);
-          a.el.classList.toggle('is-front', depth > 0.82);
+          /* 薄いラベルは押せないようにする（クリック判定は見た目と一致させる） */
+          a.el.classList.toggle('is-back', vis < 0.35);
+          a.el.classList.toggle('is-front', vis > 0.9);
         }
       }
     }
@@ -349,6 +362,9 @@
         else busy = true;
       } else if (dragging) {
         busy = true;
+      } else if (tour) {
+        advanceTour(dt);
+        busy = true;
       } else {
         /* 慣性 */
         if (Math.abs(velYaw) > 0.0004 || Math.abs(velPitch) > 0.0004) {
@@ -361,15 +377,6 @@
           velYaw = 0; velPitch = 0;
         }
 
-        /* 未操作のあいだだけ、ごくゆっくり自動回転して「回せる」ことを示す */
-        if (autoSpin && !userInteracted) {
-          if (now < autoSpinDeadline) {
-            yaw += AUTO_SPIN_SPEED * dt;
-            busy = true;
-          } else {
-            autoSpin = false;
-          }
-        }
       }
 
       drawFrame();
@@ -476,6 +483,61 @@
       return true;
     }
 
+    /* ---------------- 無操作時の自動回転（巡回） ----------------
+       文字は正面を向いたときだけ見えるので、横回転だけだと回転軸上にある
+       上下のカテゴリが永久に出てこない。そこで正面（HIDD）と各カテゴリを
+       順に正面へ持ってくる経路を、一定の角速度で回り続ける。 */
+
+    var TOUR_STOPS = (function () {
+      var list = [[0, 0, 1]];                                   // まず正面（HIDD）
+      for (var i = 0; i < DATA.categories.length; i++) list.push(DATA.direction(i));
+      return list;
+    })();
+
+    function beginTourLeg() {
+      var target = facingAngles(TOUR_STOPS[tourStep % TOUR_STOPS.length]);
+      var dYaw = shortestAngle(yaw, target.yaw);
+      var dPitch = target.pitch - pitch;
+      var span = Math.max(Math.abs(dYaw), Math.abs(dPitch));
+      tour = {
+        fromYaw: yaw, fromPitch: pitch,
+        dYaw: dYaw, dPitch: dPitch,
+        t: 0,
+        dur: Math.max(200, (span / TOUR_RAD_PER_SEC) * 1000)
+      };
+    }
+
+    function advanceTour(dt) {
+      tour.t += (dt * 1000) / tour.dur;
+      if (tour.t >= 1) {
+        yaw = tour.fromYaw + tour.dYaw;
+        pitch = tour.fromPitch + tour.dPitch;
+        tourStep++;
+        beginTourLeg();                 /* 止まらずに次の区間へ */
+      } else {
+        yaw = tour.fromYaw + tour.dYaw * tour.t;
+        pitch = tour.fromPitch + tour.dPitch * tour.t;
+      }
+    }
+
+    function startTour() {
+      tourStep = 0;
+      beginTourLeg();
+      requestRender();
+    }
+
+    /** 操作があった。巡回を止めて、無操作タイマーを測り直す */
+    function noteActivity() {
+      tour = null;
+      if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+      if (reduceMotion) return;         /* 視差効果を減らす設定では回さない */
+      idleTimer = setTimeout(function () {
+        idleTimer = null;
+        if (document.hidden) return;    /* 見えていないときは回さない */
+        startTour();
+      }, IDLE_MS);
+    }
+
     labelHost.addEventListener('click', function (e) {
       var link = e.target.closest ? e.target.closest('.label--cat') : null;
       if (!link) return;
@@ -499,9 +561,9 @@
     /* ---------------- その他 ---------------- */
 
     function markInteracted() {
+      noteActivity();
       if (userInteracted) return;
       userInteracted = true;
-      autoSpin = false;
       var hint = document.getElementById('hint');
       if (hint) hint.classList.add('is-hidden');
     }
@@ -515,8 +577,10 @@
     /* タブが見えていないあいだは描画しない */
     document.addEventListener('visibilitychange', function () {
       if (document.hidden) {
-        autoSpin = false;
+        tour = null;
+        if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
       } else {
+        noteActivity();
         requestRender();
       }
     });
@@ -528,13 +592,11 @@
       animateIn: function (duration) {
         if (reduceMotion) {
           introScale = 1; introOpacity = 1;
-          autoSpinDeadline = 0;
           requestRender();
           return;
         }
         intro = { start: performance.now(), dur: duration || 1100 };
-        /* 入場が終わったあと 10 秒ほどだけ自動回転する */
-        autoSpinDeadline = performance.now() + (duration || 1100) + 10000;
+        noteActivity();      /* ここから無操作時間の計測を始める */
         requestRender();
       },
       render: requestRender
