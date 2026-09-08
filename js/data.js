@@ -191,15 +191,31 @@ window.HIDD_DATA.indexOf = function (category) {
 /**
  * カテゴリの球面上の向き（単位ベクトル）。
  *
- * 真上（+Y）を起点に、記載順で時計回りに 360/N 度ずつ等間隔で並べる。
- * すべて z = 0 の面（＝カメラから見て正面を取り巻くリング）に置くので、
- * 正面（+Z）は HIDD の表示用に必ず空く。
- * カテゴリを増減しても自動で均等配置になる。
+ * 5 個までは、記載順に「上・右・下・左・後ろ」の軸方向へ割り当てる。
+ * 正面（+Z）は HIDD の表示用に必ず空けるので、後ろ向きのカテゴリは
+ * 既定の向きでは球体の裏に隠れ、180 度回すと正面に出てくる。
+ *
+ * 6 個以上になった場合は軸だけでは足りないので、正面を空けたまま
+ * 真上を起点に 360/N 度ずつの等間隔リングへ自動で切り替える。
  */
+var AXIS_DIRECTIONS = [
+  [0, 1, 0],    // 上
+  [1, 0, 0],    // 右
+  [0, -1, 0],   // 下
+  [-1, 0, 0],   // 左
+  [0, 0, -1]    // 後ろ
+];
+
 window.HIDD_DATA.direction = function (index) {
   var n = window.HIDD_DATA.categories.length;
+  if (n <= AXIS_DIRECTIONS.length) return AXIS_DIRECTIONS[index];
   var a = (index / n) * Math.PI * 2;
   return [Math.sin(a), Math.cos(a), 0];
+};
+
+/** そのカテゴリが既定の向きで球体の裏側に隠れるか（＝後ろ向きか） */
+window.HIDD_DATA.isBehind = function (index) {
+  return window.HIDD_DATA.direction(index)[2] < -0.5;
 };
 
 /** 動画の視聴用 URL を組み立てる（mode: 'preview' | 'view'） */

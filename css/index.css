@@ -24,8 +24,8 @@
 .sphere-wrap {
   position: relative;
   flex: 0 0 auto;
-  width: min(70vmin, 640px);
-  height: min(70vmin, 640px);
+  width: min(73vmin, 620px);
+  height: min(73vmin, 620px);
   /* ラベルが球の外側にはみ出せるようにする */
   overflow: visible;
 }
@@ -34,7 +34,7 @@
   position: absolute;
   /* ラップいっぱいに描かず内側に寄せ、外周の余白をカテゴリラベルの居場所にする。
      .labels も同じ inset にして、ラベルの座標計算をキャンバス基準のまま使えるようにする。 */
-  inset: 9%;
+  inset: 6%;
   cursor: grab;
   touch-action: none;      /* ドラッグ時にページがスクロールしないように */
   border-radius: 50%;
@@ -46,7 +46,7 @@
 
 .labels {
   position: absolute;
-  inset: 9%;               /* .sphere-canvas と必ず同じ値にすること */
+  inset: 6%;               /* .sphere-canvas と必ず同じ値にすること */
   pointer-events: none;    /* 個々のラベルだけ有効化する */
 }
 
