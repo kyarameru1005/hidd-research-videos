@@ -453,7 +453,7 @@ window.HIDDTexture = (function () {
     materials: materials,
     dotSprite: dotSprite,
 
-    /* texture-demo.html（比較ページ）が使う一覧 */
+    /* demo/texture.html（比較ページ）が使う一覧 */
     options: [
       {
         key: 'dots',

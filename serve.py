@@ -6,8 +6,13 @@ HIDD — 動作確認・展示用の簡易サーバー
 動画のシークができず、再生位置の復元（レジューム）が効きません。
 このスクリプトは Range に対応した最小限のサーバーです。
 
-    python3 serve.py            # http://localhost:8000/
+    python3 serve.py            # http://localhost:8000/src/     本番サイト
     python3 serve.py 9000       # ポートを変える
+
+リポジトリ全体を配信するので、次の URL で開けます。
+
+    /src/            本番サイト
+    /demo/           検討用デモの一覧
 """
 import http.server
 import os
@@ -103,7 +108,9 @@ if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
     with Server(("", port), RangeHandler) as httpd:
-        print("HIDD を配信中: http://localhost:%d/  （Ctrl+C で終了）" % port)
+        print("HIDD を配信中  （Ctrl+C で終了）")
+        print("  本番サイト: http://localhost:%d/src/" % port)
+        print("  検討用デモ: http://localhost:%d/demo/" % port)
         try:
             httpd.serve_forever()
         except KeyboardInterrupt:

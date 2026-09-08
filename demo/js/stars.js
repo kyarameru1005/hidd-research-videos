@@ -90,8 +90,8 @@
         cat: cat,
         catIndex: ci,
         video: video,
-        /* デモ用の確認動画。本番では js/data.js の video.file を使う */
-        file: 'videos/sample/' + cat.id + '-0' + (vi + 1) + '.mp4',
+        /* デモ用の確認動画。本番では src/js/data.js の video.file を使う */
+        file: '../src/videos/sample/' + cat.id + '-0' + (vi + 1) + '.mp4',
         dir: scatter(d, theta, phi)
       });
     });
@@ -427,7 +427,7 @@
       statusEl.classList.add('is-live');
       statusEl.innerHTML = '<b>' + cat.label + '</b> を選択中 — 周りの星が ' +
         cat.videos.length + ' 本の動画です（もう一度押すと解除）' +
-        ' <a class="sd-link" href="category.html?cat=' + encodeURIComponent(cat.id) + '">一覧ページを開く →</a>';
+        ' <a class="sd-link" href="../src/category.html?cat=' + encodeURIComponent(cat.id) + '">一覧ページを開く →</a>';
     }
   }
 

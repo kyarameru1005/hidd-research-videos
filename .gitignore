@@ -14,5 +14,5 @@ tmp/
 # 動画ファイル
 # 実物は Git に入れない（GitHub は 1 ファイル 100MB 上限、リポジトリも肥大化するため）。
 # USB や共有ドライブで配布し、展示機の videos/ に置く。
-videos/*
-!videos/sample/
+src/videos/*
+!src/videos/sample/

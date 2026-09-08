@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>検討用デモ一覧 — HIDD</title>
+<link rel="stylesheet" href="../src/css/common.css">
+<style>
+.hub { max-width: 900px; margin: 0 auto; padding: clamp(32px, 8vh, 72px) clamp(20px, 5vw, 40px) 80px; }
+.hub__back { font-size: 13px; color: var(--fg-mute); }
+.hub__back:hover { color: #fff; }
+.hub__title { margin: 18px 0 10px; font-size: clamp(22px, 3.4vw, 34px); font-weight: 800; }
+.hub__lead { margin: 0 0 8px; color: var(--fg-mute); font-size: 14px; max-width: 66ch; }
+.hub__note {
+  margin: 16px 0 36px; max-width: 66ch; font-size: 12.5px; color: var(--fg-dim);
+  padding: 10px 14px; border-left: 2px solid var(--border-hi);
+  background: var(--surface); border-radius: 0 8px 8px 0;
+}
+.hub__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.hub__item {
+  display: block; padding: 20px 22px;
+  border: 1px solid var(--border); border-radius: 14px; background: var(--surface);
+  transition: border-color .2s var(--ease), background-color .2s var(--ease), transform .2s var(--ease);
+}
+.hub__item:hover { border-color: var(--border-hi); background: var(--surface-hi); transform: translateY(-2px); }
+.hub__item h2 { margin: 0 0 6px; font-size: 16px; font-weight: 700; }
+.hub__item p { margin: 0; font-size: 13px; color: var(--fg-mute); line-height: 1.7; }
+.hub__tag {
+  display: inline-block; margin-bottom: 10px;
+  font-size: 10.5px; letter-spacing: .14em; color: var(--fg-dim);
+  border: 1px solid var(--border); border-radius: 999px; padding: 2px 9px;
+}
+.hub__tag--open { color: var(--accent-ai); border-color: rgba(90,200,250,.4); }
+</style>
+</head>
+<body>
+
+<div class="bg-glow"></div>
+
+<main class="hub">
+  <a class="hub__back" href="../src/index.html">&larr; 本番サイトへ</a>
+  <h1 class="hub__title">検討用デモ一覧</h1>
+  <p class="hub__lead">
+    見た目や挙動を決めるために作った比較・試作ページです。実データを描画しているので、実物で判断できます。
+  </p>
+  <p class="hub__note">
+    ここにあるページは <strong>本番サイト（<code>src/</code>）には影響しません</strong>。
+    採用が決まったものだけを本番へ取り込みます。
+  </p>
+
+  <ul class="hub__list">
+    <li>
+      <a class="hub__item" href="texture.html">
+        <span class="hub__tag">採用済み — 案 2</span>
+        <h2>球体テクスチャ 6 案</h2>
+        <p>球体の表面をどう見せるかの比較。画像ファイルを使わず JavaScript で生成しています。
+           本番には「カテゴリ色の 4 分割グロー」を適用済みです。</p>
+      </a>
+    </li>
+    <li>
+      <a class="hub__item" href="category-ui.html">
+        <span class="hub__tag hub__tag--open">未決定</span>
+        <h2>動画一覧ページの UI 6 案</h2>
+        <p>カテゴリを選んだあとの一覧画面の比較。カード型を並べ替えただけにならないよう、
+           6 案ともレイアウトの骨格から変えています。現状の実装も参考として先頭に並べています。</p>
+      </a>
+    </li>
+    <li>
+      <a class="hub__item" href="stars.html">
+        <span class="hub__tag hub__tag--open">検討中</span>
+        <h2>星 + 放置時の自動再生</h2>
+        <p>1 等星＝カテゴリ、周りの小さな星＝動画 1 本ずつ。放置すると球体が回り出し、
+           ランダムに星を選んでカードが生え、動画を再生します。</p>
+      </a>
+    </li>
+  </ul>
+</main>
+
+</body>
+</html>
