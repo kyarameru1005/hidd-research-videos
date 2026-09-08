@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>カテゴリ — HIDD 先行研究 紹介動画</title>
+<link rel="stylesheet" href="css/common.css">
+<link rel="stylesheet" href="css/category.css">
+</head>
+<body class="page-category">
+
+<div class="bg-glow"></div>
+
+<header class="cat-header">
+  <div class="cat-header__inner">
+    <a class="back-link" href="index.html">
+      <span class="back-link__arrow" aria-hidden="true">&larr;</span>球体に戻る
+    </a>
+    <p class="cat-eyebrow" id="catEyebrow"></p>
+    <h1 class="cat-title" id="catTitle">読み込み中…</h1>
+    <p class="cat-desc" id="catDesc"></p>
+  </div>
+</header>
+
+<main class="cat-main">
+  <ul class="video-grid" id="videoGrid"></ul>
+  <p class="empty-note" id="emptyNote" hidden></p>
+</main>
+
+<footer class="cat-footer">
+  <p class="cat-footer__title">ほかのカテゴリ</p>
+  <ul class="cat-footer__list" id="otherCats"></ul>
+</footer>
+
+<!-- 動画モーダル -->
+<div class="modal" id="modal" hidden>
+  <div class="modal__backdrop" data-close></div>
+  <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal__head">
+      <h2 class="modal__title" id="modalTitle"></h2>
+      <button class="modal__close" type="button" data-close aria-label="閉じる">&times;</button>
+    </div>
+    <div class="modal__player">
+      <iframe id="modalFrame" title="動画プレーヤー" allow="autoplay; fullscreen"
+              allowfullscreen referrerpolicy="no-referrer"></iframe>
+    </div>
+    <p class="modal__note">
+      再生されない場合は共有設定が限定されている可能性があります。
+      <a id="modalOpen" href="#" target="_blank" rel="noopener noreferrer">Google ドライブで開く</a>
+    </p>
+  </div>
+</div>
+
+<script src="js/data.js"></script>
+<script src="js/category.js"></script>
+</body>
+</html>

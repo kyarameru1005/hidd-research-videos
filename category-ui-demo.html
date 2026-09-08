@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>動画一覧 UI 比較 — HIDD</title>
+<link rel="stylesheet" href="css/common.css">
+<link rel="stylesheet" href="css/category.css">
+<link rel="stylesheet" href="css/category-ui-demo.css">
+</head>
+<body class="page-uidemo">
+
+<header class="uid-header">
+  <a class="uid-back" href="index.html">&larr; 本番サイトに戻る</a>
+  <h1 class="uid-title">動画一覧ページの UI 6 案</h1>
+  <p class="uid-lead">
+    カテゴリを選んだあとの「動画一覧」画面の見た目を比較します。
+    どれも <strong>同じデータ（js/data.js）を実際に描画</strong> しているので、実物で判断できます。
+    カード型を並べ替えただけの案にならないよう、6 案とも<strong>レイアウトの骨格から変えて</strong>います。
+  </p>
+  <p class="uid-note">
+    このページは検討用です。本番の <code>category.html</code> には手を入れていません。
+    動画の再生方法（モーダル＋ Google ドライブへのリンク）はどの案を選んでも同じです。
+  </p>
+</header>
+
+<div class="uid-controls">
+  <div class="uid-controls__inner">
+    <span class="uid-ctl-label">カテゴリ</span>
+    <div class="uid-seg" id="segCat"></div>
+    <nav class="uid-jump" id="jumpNav" aria-label="案へのジャンプ"></nav>
+  </div>
+</div>
+
+<main id="demoRoot"></main>
+
+<footer class="uid-footer">
+  <p>気に入った案の番号を伝えてください。本番の <code>category.html</code> に適用します。</p>
+</footer>
+
+<script src="js/data.js"></script>
+<script src="js/category-ui-demo.js"></script>
+</body>
+</html>

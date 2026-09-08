@@ -1,0 +1,390 @@
+/* HIDD — 動画一覧 UI 比較ページ（検討用）
+   各案は .ui1 〜 .ui6 で完全にスコープを分け、明暗もフォントも独立させる。 */
+
+.page-uidemo { padding-bottom: 0; }
+
+/* ---------------- ページ外枠 ---------------- */
+
+.uid-header {
+  max-width: 1180px; margin: 0 auto;
+  padding: clamp(28px, 6vh, 56px) clamp(20px, 5vw, 40px) 0;
+}
+.uid-back { font-size: 13px; color: var(--fg-mute); }
+.uid-back:hover { color: #fff; }
+.uid-title { margin: 18px 0 10px; font-size: clamp(22px, 3.4vw, 34px); font-weight: 800; }
+.uid-lead { margin: 0; max-width: 72ch; color: var(--fg-mute); font-size: 14px; }
+.uid-note {
+  margin: 14px 0 0; max-width: 72ch; font-size: 12.5px; color: var(--fg-dim);
+  padding: 10px 14px; border-left: 2px solid var(--border-hi);
+  background: var(--surface); border-radius: 0 8px 8px 0;
+}
+
+.uid-controls {
+  position: sticky; top: 0; z-index: 20;
+  margin-top: 28px; padding: 12px clamp(20px, 5vw, 40px);
+  background: rgba(6, 7, 13, 0.9);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+}
+.uid-controls__inner {
+  max-width: 1180px; margin: 0 auto;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px;
+}
+.uid-ctl-label { font-size: 11px; letter-spacing: 0.14em; color: var(--fg-dim); }
+
+.uid-seg { display: flex; flex-wrap: wrap; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+.uid-seg button {
+  font: inherit; font-size: 12px; color: var(--fg-mute);
+  padding: 6px 14px; background: transparent; border: 0; cursor: pointer;
+  transition: background-color .15s, color .15s;
+}
+.uid-seg button + button { border-left: 1px solid var(--border); }
+.uid-seg button:hover { color: #fff; }
+.uid-seg button[aria-pressed="true"] { background: var(--surface-hi); color: #fff; }
+
+.uid-jump { margin-left: auto; display: flex; gap: 6px; }
+.uid-jump a {
+  font-size: 12px; color: var(--fg-dim);
+  width: 26px; height: 26px; display: grid; place-items: center;
+  border: 1px solid var(--border); border-radius: 6px;
+}
+.uid-jump a:hover { color: #fff; border-color: var(--border-hi); }
+
+/* 各案の見出し帯 */
+.uid-case { scroll-margin-top: 60px; }
+.uid-case__bar {
+  max-width: 1180px; margin: 0 auto;
+  padding: clamp(36px, 6vh, 56px) clamp(20px, 5vw, 40px) 16px;
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 14px;
+}
+.uid-case__num {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.14em; color: var(--fg-dim);
+  border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px;
+}
+.uid-case__name { margin: 0; font-size: 17px; font-weight: 700; }
+.uid-case__desc { margin: 0; flex: 1 1 320px; font-size: 13px; color: var(--fg-mute); }
+
+.uid-frame { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+
+.uid-footer {
+  max-width: 1180px; margin: 0 auto; padding: 48px clamp(20px, 5vw, 40px) 80px;
+  color: var(--fg-mute); font-size: 14px;
+}
+
+/* 現状（参考）の枠 */
+.uid-current { background: #06070d; padding: 28px clamp(20px, 5vw, 40px) 40px; }
+.uid-current .video-grid { max-width: 1180px; margin: 0 auto; }
+
+/* ============================================================
+   案 1: エディトリアル（雑誌の目次）
+   明るい紙色 / 明朝 / 非対称 2 カラム / 罫線のみ
+   ============================================================ */
+
+.ui1 {
+  --paper: #f2efe7;
+  --ink: #1b1a17;
+  --ink-mute: #6b675e;
+  background: var(--paper); color: var(--ink);
+  font-family: var(--font);
+  padding: clamp(40px, 7vh, 76px) clamp(20px, 5vw, 40px);
+}
+.ui1__inner { max-width: 940px; margin: 0 auto; }
+
+.ui1__masthead {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 20px; padding-bottom: 18px;
+  border-bottom: 2px solid var(--ink);
+}
+.ui1__kicker {
+  margin: 0 0 6px; font-size: 11px; letter-spacing: 0.28em; text-transform: uppercase;
+  color: var(--ink-mute);
+}
+.ui1__title {
+  margin: 0;
+  font-family: "Hiragino Mincho ProN", "Yu Mincho", YuMincho, "Times New Roman", serif;
+  font-size: clamp(26px, 4.4vw, 44px); font-weight: 600; line-height: 1.2;
+  letter-spacing: 0.01em;
+}
+.ui1__count { font-size: 12px; color: var(--ink-mute); white-space: nowrap; }
+
+.ui1__list { list-style: none; margin: 0; padding: 0; }
+.ui1__item {
+  display: grid; grid-template-columns: 84px 1fr;
+  gap: 0 24px; padding: 26px 0;
+  border-bottom: 1px solid rgba(27, 26, 23, 0.18);
+  cursor: pointer;
+}
+.ui1__item:hover .ui1__t { text-decoration: underline; text-underline-offset: 4px; }
+.ui1__no {
+  font-family: "Hiragino Mincho ProN", "Yu Mincho", YuMincho, serif;
+  font-size: 26px; line-height: 1; color: var(--ink-mute);
+  padding-top: 4px;
+}
+.ui1__lab { display: block; font-size: 11px; letter-spacing: 0.16em; color: var(--ink-mute); margin-bottom: 7px; }
+.ui1__t {
+  margin: 0 0 8px;
+  font-family: "Hiragino Mincho ProN", "Yu Mincho", YuMincho, serif;
+  font-size: clamp(17px, 2.2vw, 23px); font-weight: 600; line-height: 1.45;
+}
+.ui1__s { margin: 0 0 12px; font-size: 13.5px; line-height: 1.85; color: #4a463f; max-width: 56ch; }
+.ui1__go { font-size: 12px; letter-spacing: 0.08em; border-bottom: 1px solid currentColor; padding-bottom: 2px; }
+
+/* ============================================================
+   案 2: インデックス（目次・表）
+   暗色 / カードなし / 罫線だけの高密度リスト
+   ============================================================ */
+
+.ui2 {
+  background: #0a0c14; color: var(--fg);
+  padding: clamp(36px, 6vh, 64px) clamp(20px, 5vw, 40px);
+}
+.ui2__inner { max-width: 1080px; margin: 0 auto; }
+
+.ui2__head {
+  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+  padding-bottom: 14px; margin-bottom: 2px;
+}
+.ui2__title { margin: 0; font-size: clamp(19px, 2.6vw, 26px); font-weight: 700; letter-spacing: 0.01em; }
+.ui2__meta { font-size: 11px; letter-spacing: 0.16em; color: var(--fg-dim); }
+
+.ui2__cols {
+  display: grid; grid-template-columns: 46px 1fr 190px 76px;
+  gap: 16px; padding: 0 0 8px;
+  font-size: 10.5px; letter-spacing: 0.18em; color: var(--fg-dim);
+  border-bottom: 1px solid var(--border-hi);
+}
+.ui2__list { list-style: none; margin: 0; padding: 0; }
+.ui2__row {
+  position: relative;
+  display: grid; grid-template-columns: 46px 1fr 190px 76px;
+  gap: 16px; align-items: baseline;
+  padding: 16px 0; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background-color .15s;
+}
+.ui2__row::before {
+  content: ""; position: absolute; left: -14px; top: 0; bottom: 0; width: 2px;
+  background: var(--accent); transform: scaleY(0); transition: transform .18s var(--ease);
+}
+.ui2__row:hover { background: rgba(255,255,255,0.035); }
+.ui2__row:hover::before { transform: scaleY(1); }
+.ui2__row:hover .ui2__play { color: var(--accent); }
+
+.ui2__no { font-family: var(--font-mono); font-size: 12px; color: var(--fg-dim); }
+.ui2__main { min-width: 0; }
+.ui2__t { margin: 0 0 4px; font-size: 15px; font-weight: 700; line-height: 1.5; }
+.ui2__s { margin: 0; font-size: 12.5px; color: var(--fg-dim); line-height: 1.6; }
+.ui2__lab { font-size: 12px; color: var(--fg-mute); }
+.ui2__play { font-size: 12px; text-align: right; color: var(--fg-mute); transition: color .15s; white-space: nowrap; }
+
+@media (max-width: 720px) {
+  .ui2__cols { display: none; }
+  .ui2__row { grid-template-columns: 34px 1fr; }
+  .ui2__lab, .ui2__play { grid-column: 2; font-size: 11.5px; }
+  .ui2__play { text-align: left; }
+}
+
+/* ============================================================
+   案 3: ターミナル / アーカイブ
+   等幅 / 黒地 / [001] 連番 / 走査線
+   ============================================================ */
+
+.ui3 {
+  position: relative;
+  background: #05070a; color: #cfe3d6;
+  font-family: var(--font-mono);
+  padding: clamp(32px, 5vh, 56px) clamp(16px, 5vw, 40px);
+  overflow: hidden;
+}
+.ui3::after {   /* 走査線 */
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(to bottom,
+    rgba(255,255,255,0.028) 0 1px, transparent 1px 3px);
+}
+.ui3__inner { position: relative; z-index: 1; max-width: 1000px; margin: 0 auto; }
+
+.ui3__prompt { font-size: 13px; color: var(--accent); margin: 0 0 4px; }
+.ui3__prompt span { color: #4e6a5c; }
+.ui3__stat { margin: 0 0 22px; font-size: 12px; color: #4e6a5c; }
+
+.ui3__list { list-style: none; margin: 0; padding: 0; }
+.ui3__row {
+  display: grid; grid-template-columns: 62px 1fr; gap: 14px;
+  padding: 11px 10px; margin: 0 -10px;
+  cursor: pointer; border-left: 2px solid transparent;
+}
+.ui3__row:hover { background: rgba(120, 220, 170, 0.07); border-left-color: var(--accent); }
+.ui3__row:hover .ui3__t { color: #fff; }
+.ui3__no { font-size: 12.5px; color: #3f5a4d; }
+.ui3__t { margin: 0; font-size: 13.5px; font-weight: 400; line-height: 1.6; color: #d6ebdd; }
+.ui3__sub { margin: 3px 0 0; font-size: 12px; color: #57776a; line-height: 1.6; }
+.ui3__sub b { color: var(--accent); font-weight: 400; }
+.ui3__cursor {
+  display: inline-block; width: 8px; height: 14px; vertical-align: -2px;
+  background: var(--accent); margin-left: 6px; animation: ui3blink 1.05s step-end infinite;
+}
+@keyframes ui3blink { 0%, 50% { opacity: 1; } 50.01%, 100% { opacity: 0; } }
+
+/* ============================================================
+   案 4: スイス / ブルータリズム
+   太い罫 / 角丸ゼロ / 極太サンセリフ / ベタ塗り
+   ============================================================ */
+
+.ui4 {
+  background: #e9e6e0; color: #000;
+  padding: clamp(28px, 5vh, 48px) clamp(16px, 5vw, 40px);
+}
+.ui4__inner { max-width: 1120px; margin: 0 auto; border: 3px solid #000; }
+
+.ui4__head {
+  display: flex; flex-wrap: wrap; align-items: stretch;
+  border-bottom: 3px solid #000;
+}
+.ui4__badge {
+  background: var(--accent); color: #000;
+  padding: 16px 20px; font-size: 12px; font-weight: 800; letter-spacing: 0.14em;
+  display: flex; align-items: center; border-right: 3px solid #000;
+}
+.ui4__title {
+  margin: 0; padding: 14px 20px; flex: 1 1 260px;
+  font-size: clamp(20px, 3vw, 32px); font-weight: 900; line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+.ui4__count {
+  padding: 16px 20px; font-size: 12px; font-weight: 800;
+  display: flex; align-items: center; border-left: 3px solid #000;
+}
+
+.ui4__grid { display: grid; grid-template-columns: repeat(2, 1fr); }
+.ui4__cell {
+  padding: 22px 20px 20px; cursor: pointer;
+  border-right: 3px solid #000; border-bottom: 3px solid #000;
+  display: flex; flex-direction: column; gap: 10px;
+  transition: background-color .12s;
+}
+.ui4__cell:nth-child(2n) { border-right: 0; }
+.ui4__cell:hover { background: var(--accent); }
+.ui4__no { font-size: 40px; font-weight: 900; line-height: 0.9; letter-spacing: -0.03em; }
+.ui4__lab { font-size: 11px; font-weight: 800; letter-spacing: 0.12em; }
+.ui4__t { margin: 0; font-size: 17px; font-weight: 800; line-height: 1.35; }
+.ui4__s { margin: 0; font-size: 13px; line-height: 1.7; flex: 1; }
+.ui4__go { font-size: 12px; font-weight: 800; letter-spacing: 0.1em; }
+
+@media (max-width: 660px) {
+  .ui4__grid { grid-template-columns: 1fr; }
+  .ui4__cell { border-right: 0; }
+}
+
+/* ============================================================
+   案 5: フィルムストリップ（横スクロール）
+   大きな縦長パネルを横に並べ、scroll-snap で送る
+   ============================================================ */
+
+.ui5 {
+  background: #07080e; color: var(--fg);
+  padding: clamp(32px, 5vh, 56px) 0;
+}
+.ui5__head {
+  max-width: 1180px; margin: 0 auto 20px;
+  padding: 0 clamp(20px, 5vw, 40px);
+  display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+}
+.ui5__title { margin: 0; font-size: clamp(19px, 2.6vw, 26px); font-weight: 700; }
+.ui5__hint { font-size: 12px; color: var(--fg-dim); margin-left: auto; }
+
+.ui5__track {
+  display: flex; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory;
+  padding: 4px clamp(20px, 5vw, 40px) 18px;
+  /* snap 位置が左の余白を無視して先頭パネルが見切れるのを防ぐ */
+  scroll-padding-left: clamp(20px, 5vw, 40px);
+  scrollbar-width: thin;
+}
+.ui5__panel {
+  position: relative; flex: 0 0 clamp(240px, 30vw, 320px);
+  aspect-ratio: 3 / 4; scroll-snap-align: start;
+  border-radius: 2px; overflow: hidden; cursor: pointer;
+  background: linear-gradient(165deg,
+    color-mix(in srgb, var(--accent) 40%, #0d1220) 0%,
+    #0a0d18 58%, #06080f 100%);
+  display: flex; flex-direction: column; justify-content: space-between;
+  padding: 20px 18px;
+  transition: transform .25s var(--ease);
+}
+@supports not (color: color-mix(in srgb, red, blue)) {
+  .ui5__panel { background: linear-gradient(165deg, #1b2740 0%, #0a0d18 58%, #06080f 100%); }
+}
+.ui5__panel:hover { transform: translateY(-6px); }
+.ui5__panel::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  border: 1px solid rgba(255,255,255,0.10);
+}
+.ui5__no {
+  font-size: 52px; font-weight: 800; line-height: 1;
+  color: rgba(255,255,255,0.16); letter-spacing: -0.03em;
+}
+.ui5__body { position: relative; }
+.ui5__lab { display: block; font-size: 11px; letter-spacing: 0.14em; color: var(--accent); margin-bottom: 8px; }
+.ui5__t { margin: 0 0 8px; font-size: 17px; font-weight: 700; line-height: 1.45; }
+.ui5__s { margin: 0 0 14px; font-size: 12.5px; color: var(--fg-mute); line-height: 1.65; }
+.ui5__play {
+  position: relative; display: inline-block; padding-left: 36px; line-height: 26px;
+  font-size: 12px; font-weight: 700;
+}
+.ui5__play::before {   /* 丸い枠 */
+  content: ""; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--accent);
+}
+.ui5__play::after {    /* 再生の三角 */
+  content: ""; position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+  width: 0; height: 0; border-style: solid;
+  border-width: 5px 0 5px 8px;
+  border-color: transparent transparent transparent var(--accent);
+}
+
+/* ============================================================
+   案 6: ポスター / タイポグラフィ
+   タイトルそのものが主役。巨大な連番を背景に敷く
+   ============================================================ */
+
+.ui6 {
+  background: #0b0b0f; color: #f2f2f4;
+  padding: clamp(32px, 5vh, 60px) clamp(20px, 5vw, 40px);
+}
+.ui6__inner { max-width: 1060px; margin: 0 auto; }
+.ui6__head { margin-bottom: 8px; }
+.ui6__title { margin: 0; font-size: 12px; letter-spacing: 0.22em; color: var(--accent); }
+
+.ui6__list { list-style: none; margin: 0; padding: 0; }
+.ui6__item {
+  position: relative; overflow: hidden;
+  padding: clamp(26px, 4vh, 40px) 0;
+  border-top: 1px solid rgba(255,255,255,0.12);
+  cursor: pointer;
+}
+.ui6__item:last-child { border-bottom: 1px solid rgba(255,255,255,0.12); }
+.ui6__ghost {
+  position: absolute; right: -6px; top: 50%; transform: translateY(-50%);
+  font-size: clamp(70px, 13vw, 150px); font-weight: 900; line-height: 0.8;
+  color: rgba(255,255,255,0.045); letter-spacing: -0.04em; pointer-events: none;
+  transition: color .25s var(--ease);
+}
+.ui6__item:hover .ui6__ghost { color: color-mix(in srgb, var(--accent) 22%, transparent); }
+@supports not (color: color-mix(in srgb, red, blue)) {
+  .ui6__item:hover .ui6__ghost { color: rgba(255,255,255,0.10); }
+}
+.ui6__body { position: relative; max-width: 68%; }
+.ui6__lab { display: block; font-size: 11px; letter-spacing: 0.16em; color: var(--fg-dim); margin-bottom: 10px; }
+.ui6__t {
+  margin: 0 0 10px;
+  font-size: clamp(21px, 3.6vw, 38px); font-weight: 800; line-height: 1.22;
+  letter-spacing: -0.01em;
+  transition: color .2s var(--ease);
+}
+.ui6__item:hover .ui6__t { color: var(--accent); }
+.ui6__s { margin: 0 0 14px; font-size: 13.5px; color: var(--fg-mute); line-height: 1.75; max-width: 52ch; }
+.ui6__go { font-size: 12px; letter-spacing: 0.1em; color: var(--fg-mute); }
+.ui6__item:hover .ui6__go { color: #fff; }
+
+@media (max-width: 720px) {
+  .ui6__body { max-width: 100%; }
+  .ui6__ghost { opacity: 0.6; }
+}

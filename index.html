@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HIDD — 先行研究 紹介動画</title>
+<meta name="description" content="先行研究の紹介動画をカテゴリ別に閲覧できるサイト。中央の球体を回してカテゴリを選択します。">
+<link rel="stylesheet" href="css/common.css">
+<link rel="stylesheet" href="css/index.css">
+</head>
+<body class="page-index">
+
+<div class="bg-glow"></div>
+
+<!-- 入場アニメーション用のオーバーレイ -->
+<div class="intro-veil" id="introVeil" aria-hidden="true">
+  <div class="intro-spark"></div>
+</div>
+
+<main class="stage" id="stage">
+
+  <h1 class="visually-hidden">HIDD 先行研究 紹介動画</h1>
+
+  <!-- 球体（Three.js のキャンバスがここに入る） -->
+  <div class="sphere-wrap" id="sphereWrap">
+    <div class="sphere-canvas" id="sphereCanvas"
+         role="application"
+         aria-label="カテゴリ選択の球体。ドラッグまたは矢印キーで回転します。"
+         tabindex="0"></div>
+
+    <!-- 3D 座標に追従する HTML ラベル群 -->
+    <div class="labels" id="labels" aria-hidden="true">
+      <div class="label label--brand" data-anchor="brand">
+        <span class="label__brand-text">HIDD</span>
+      </div>
+      <!-- カテゴリラベルは js/sphere.js が data.js から生成 -->
+    </div>
+  </div>
+
+  <p class="hint" id="hint">
+    <span class="hint__icon" aria-hidden="true"></span>
+    球体をドラッグして回す ／ カテゴリをクリックで移動
+  </p>
+
+  <!-- WebGL 非対応時のフォールバック兼、キーボード・支援技術向けの正規リンク -->
+  <nav class="fallback-nav" id="fallbackNav" aria-label="カテゴリ">
+    <p class="fallback-nav__title">カテゴリから選ぶ</p>
+    <ul class="fallback-nav__list" id="fallbackList"></ul>
+  </nav>
+
+</main>
+
+<script src="vendor/three.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/texture-lab.js"></script>
+<script src="js/sphere.js"></script>
+<script src="js/intro.js"></script>
+</body>
+</html>

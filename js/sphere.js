@@ -1,0 +1,554 @@
+/**
+ * HIDD — トップページの球体
+ *
+ * ・Three.js (UMD / THREE グローバル) で低ポリのワイヤーフレーム球を描く
+ * ・カテゴリ名は 3D テキストではなく、3D 座標に追従する HTML 要素として描く
+ * ・静止したら描画ループを止める（低スペック PC 対策で最も効く）
+ */
+(function () {
+  'use strict';
+
+  var DATA = window.HIDD_DATA;
+  var TAU = Math.PI * 2;
+  var HALF_PI = Math.PI / 2;
+
+  /* アンカーの半径。カテゴリは球の外側に浮かせ、HIDD は球面に貼り付ける。
+     カテゴリが 5 個になりラベルが上下に広がるため、4 個のとき（1.22）より内側に寄せている。 */
+  var LABEL_R = 1.16;
+  var BRAND_R = 1.02;
+
+
+  var reduceMotion = window.matchMedia &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------------- ユーティリティ ---------------- */
+
+  function clamp(v, lo, hi) { return v < lo ? lo : (v > hi ? hi : v); }
+
+  /**
+   * 単位ベクトル d を正面（+Z）に持ってくる yaw / pitch を求める。
+   *
+   * 球の回転は R = Rx(pitch) * Ry(yaw)（Three.js 既定の 'XYZ'）。
+   * これで正面に来る向きは d = (-cos(pitch)·sin(yaw), sin(pitch), cos(pitch)·cos(yaw)) なので、
+   * 逆に解くと pitch = asin(dy), yaw = atan2(-dx, dz)。
+   * pitch は必ず ±90 度以内に収まるため、クランプに引っかからない。
+   */
+  function facingAngles(d) {
+    return {
+      pitch: Math.asin(clamp(d[1], -1, 1)),
+      yaw: Math.atan2(-d[0], d[2])
+    };
+  }
+
+  function easeInOutCubic(t) {
+    return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  }
+
+  /* 角度差を -PI..PI に畳んで最短経路にする */
+  function shortestAngle(from, to) {
+    var d = (to - from) % TAU;
+    if (d > Math.PI) d -= TAU;
+    if (d < -Math.PI) d += TAU;
+    return d;
+  }
+
+  function hasWebGL() {
+    try {
+      var c = document.createElement('canvas');
+      return !!(window.WebGLRenderingContext &&
+        (c.getContext('webgl') || c.getContext('experimental-webgl')));
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /* ---------------- フォールバック / キーボード用ナビ ---------------- */
+
+  function buildFallbackNav() {
+    var list = document.getElementById('fallbackList');
+    if (!list) return;
+
+    DATA.categories.forEach(function (cat) {
+      var li = document.createElement('li');
+      var a = document.createElement('a');
+      a.className = 'fallback-nav__link';
+      a.href = 'category.html?cat=' + encodeURIComponent(cat.id);
+      a.textContent = cat.label;
+      a.style.setProperty('--cat-accent', cat.accent);
+      li.appendChild(a);
+      list.appendChild(li);
+    });
+
+    var nav = document.getElementById('fallbackNav');
+    if (nav && !hasWebGL()) {
+      var note = document.createElement('p');
+      note.className = 'no-webgl-note';
+      note.textContent = 'このブラウザでは 3D 表示が使えないため、一覧から選択してください。';
+      nav.insertBefore(note, nav.firstChild);
+    }
+  }
+
+  /* ---------------- 球体本体 ---------------- */
+
+  function createSphere() {
+    var host = document.getElementById('sphereCanvas');
+    var labelHost = document.getElementById('labels');
+    var brandEl = labelHost.querySelector('[data-anchor="brand"]');
+
+    var scene = new THREE.Scene();
+    var camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+    camera.position.set(0, 0, 3.6);
+
+    var renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+    renderer.setClearColor(0x000000, 0);
+    host.appendChild(renderer.domElement);
+
+    /* 回転させる対象をまとめるグループ */
+    var group = new THREE.Group();
+    scene.add(group);
+
+    /* 球体本体。テクスチャは js/texture-lab.js が起動時に 1 枚だけ生成する。
+       別案に変えたい場合は materials.quad を dots / circuit / rim / nebula / globe に差し替える。 */
+    var sphereMat = HIDDTexture.materials.quad();
+    var sphere = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 32), sphereMat);
+    group.add(sphere);
+
+    /* 赤道と経線のリング（「球」であることを分かりやすくする） */
+    var ringMat = new THREE.LineBasicMaterial({
+      color: 0xbfe4ff, transparent: true, opacity: 0.34
+    });
+    function ring(rotX, rotY) {
+      var pts = [];
+      var SEG = 96;
+      for (var i = 0; i <= SEG; i++) {
+        var a = (i / SEG) * TAU;
+        pts.push(new THREE.Vector3(Math.cos(a) * 1.012, Math.sin(a) * 1.012, 0));
+      }
+      var line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), ringMat);
+      line.rotation.x = rotX;
+      line.rotation.y = rotY;
+      return line;
+    }
+    group.add(ring(HALF_PI, 0));  // 赤道
+    group.add(ring(0, 0));        // 経線 1
+    group.add(ring(0, HALF_PI));  // 経線 2
+
+    /* カテゴリ位置のマーカー（球面上の点） */
+    var markerPos = [];
+    var markerCol = [];
+    DATA.categories.forEach(function (cat, i) {
+      var d = DATA.direction(i);
+      /* 半径 1.0 の球面ぴったりだと、輪郭付近のマーカーが球に隠れて見えなくなる。
+         カメラ距離 3.6 では 1.04 以上でないと輪郭の外に出ないため、余裕を持たせる。 */
+      markerPos.push(d[0] * 1.06, d[1] * 1.06, d[2] * 1.06);
+      var c = new THREE.Color(cat.accent);
+      markerCol.push(c.r, c.g, c.b);
+    });
+    var markerGeo = new THREE.BufferGeometry();
+    markerGeo.setAttribute('position', new THREE.Float32BufferAttribute(markerPos, 3));
+    markerGeo.setAttribute('color', new THREE.Float32BufferAttribute(markerCol, 3));
+    var markers = new THREE.Points(markerGeo, new THREE.PointsMaterial({
+      size: 0.11,
+      map: HIDDTexture.dotSprite(),      /* 既定の四角ではなく丸い点にする */
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false,                  /* 発光の縁が他を削らないように */
+      sizeAttenuation: true
+    }));
+    group.add(markers);
+
+    /* --------- ラベルのアンカー（グループの子にして一緒に回す） --------- */
+
+    var anchors = [];
+
+    function addAnchor(el, localPos, category) {
+      var obj = new THREE.Object3D();
+      obj.position.set(localPos[0], localPos[1], localPos[2]);
+      group.add(obj);
+      anchors.push({
+        el: el,
+        obj: obj,
+        category: category || null,
+        radius: obj.position.length(),
+        world: new THREE.Vector3()
+      });
+    }
+
+    addAnchor(brandEl, [0, 0, BRAND_R], null);
+
+    DATA.categories.forEach(function (cat, i) {
+      var d = DATA.direction(i);
+
+      var a = document.createElement('a');
+      a.className = 'label label--cat';
+      a.href = 'category.html?cat=' + encodeURIComponent(cat.id);
+      a.textContent = cat.label;
+      a.style.setProperty('--cat-accent', cat.accent);
+      a.setAttribute('tabindex', '-1');   /* キーボードは下部ナビが担当する */
+      a.dataset.cat = cat.id;
+      labelHost.appendChild(a);
+
+      addAnchor(a, [d[0] * LABEL_R, d[1] * LABEL_R, d[2] * LABEL_R], cat);
+    });
+
+    /* ---------------- 状態 ---------------- */
+
+    var yaw = 0, pitch = 0;
+    var velYaw = 0, velPitch = 0;
+    var introScale = reduceMotion ? 1 : 0.001;
+    var introOpacity = reduceMotion ? 1 : 0;
+
+    var dragging = false;
+    var pointerId = null;
+    var lastX = 0, lastY = 0, lastT = 0;
+    var userInteracted = false;
+
+    var autoSpin = !reduceMotion;
+    var AUTO_SPIN_SPEED = 0.055;   // rad/s
+    var autoSpinDeadline = 0;      // これを過ぎたら自動回転を止める
+
+    var snap = null;               // { fromYaw, fromPitch, dYaw, dPitch, start, dur, onDone }
+    var intro = null;              // { start, dur }
+
+    var running = false;
+    var lastFrame = 0;
+    var width = 1, height = 1;
+
+    /* ---------------- サイズ ---------------- */
+
+    var wrapRect = { left: 0, top: 0 };
+
+    function measureLabels() {
+      wrapRect = host.getBoundingClientRect();
+      for (var i = 0; i < anchors.length; i++) {
+        anchors[i].hw = anchors[i].el.offsetWidth / 2;
+        anchors[i].hh = anchors[i].el.offsetHeight / 2;
+      }
+    }
+
+    function resize() {
+      var rect = host.getBoundingClientRect();
+      width = Math.max(1, Math.round(rect.width));
+      height = Math.max(1, Math.round(rect.height));
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height);
+      measureLabels();
+      requestRender();
+    }
+
+    /* ---------------- ラベル更新 ---------------- */
+
+    var tmp = new THREE.Vector3();
+
+    function updateLabels() {
+      for (var i = 0; i < anchors.length; i++) {
+        var a = anchors[i];
+        a.obj.getWorldPosition(a.world);
+
+        /* 奥行き: 球の中心から見た z。+1 が手前、-1 が奥 */
+        var depth = clamp(a.world.z / (a.radius * (introScale || 1)), -1, 1);
+
+        tmp.copy(a.world).project(camera);
+        var x = (tmp.x * 0.5 + 0.5) * width;
+        var y = (-tmp.y * 0.5 + 0.5) * height;
+
+        var hw = a.hw || 0, hh = a.hh || 0;
+
+        /* 球の輪郭側に来たラベルは、球に重ならないよう半径方向へ逃がす。
+           rim は 0 = 正面（球に貼り付いて見せる）、1 = 輪郭。 */
+        if (a.category) {
+          var dx = x - width / 2;
+          var dy = y - height / 2;
+          var len = Math.sqrt(dx * dx + dy * dy);
+          if (len > 1) {
+            var rim = Math.sqrt(Math.max(0, 1 - depth * depth));
+            var ux = dx / len, uy = dy / len;
+            /* 逃がしすぎるとラベルの輪が縦に広がって画面に収まらないので 7 割に抑える。
+               球体が滑らかなグラデーションになった今は、縁に少し掛かっても読みにくくならない。 */
+            var push = (hw * Math.abs(ux) + hh * Math.abs(uy)) * rim * 0.7;
+            x += ux * push;
+            y += uy * push;
+          }
+        }
+
+        /* 長いラベルが画面外へ出ないよう、ビューポート内に押し戻す */
+        var loX = 10 - wrapRect.left + hw;
+        var hiX = (window.innerWidth - 10) - wrapRect.left - hw;
+        if (hiX > loX) x = clamp(x, loX, hiX);
+        var loY = 10 - wrapRect.top + hh;
+        var hiY = (window.innerHeight - 10) - wrapRect.top - hh;
+        if (hiY > loY) y = clamp(y, loY, hiY);
+
+        var scale = 0.86 + 0.14 * ((depth + 1) / 2);
+        var opacity = clamp(0.06 + 0.94 * ((depth + 0.55) / 1.5), 0, 1) * introOpacity;
+
+        a.el.style.transform =
+          'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0)' +
+          ' translate(-50%,-50%) scale(' + scale.toFixed(3) + ')';
+        a.el.style.opacity = opacity.toFixed(3);
+        a.el.style.zIndex = String(Math.round((depth + 1) * 100));
+
+        if (a.category) {
+          a.el.classList.toggle('is-back', depth < -0.15);
+          a.el.classList.toggle('is-front', depth > 0.82);
+        }
+      }
+    }
+
+    /* ---------------- 描画ループ ---------------- */
+
+    /* 現在の状態を 1 フレーム分だけ反映して描く。
+       ループからも、読み込み直後の初回描画からも呼ぶ。 */
+    function drawFrame() {
+      pitch = clamp(pitch, -HALF_PI, HALF_PI);
+
+      group.rotation.set(pitch, yaw, 0);   // 既定の 'XYZ' = Rx * Ry
+      group.scale.setScalar(introScale);
+      sphereMat.uniforms.uFade.value = introOpacity;
+      ringMat.opacity = 0.34 * introOpacity;
+      markers.material.opacity = 0.95 * introOpacity;
+
+      group.updateMatrixWorld(true);
+      renderer.render(scene, camera);
+      updateLabels();
+    }
+
+    function requestRender() {
+      if (running) return;
+      running = true;
+      lastFrame = performance.now();
+      requestAnimationFrame(frame);
+    }
+
+    function frame(now) {
+      var dt = Math.min((now - lastFrame) / 1000, 0.05);
+      lastFrame = now;
+
+      var busy = false;
+
+      /* 入場アニメーション */
+      if (intro) {
+        var it = clamp((now - intro.start) / intro.dur, 0, 1);
+        var e = easeInOutCubic(it);
+        introScale = 0.001 + e * 0.999;
+        introOpacity = clamp((it - 0.25) / 0.55, 0, 1);
+        if (it >= 1) { intro = null; introScale = 1; introOpacity = 1; }
+        else busy = true;
+      }
+
+      /* クリックされたカテゴリを正面へ寄せる */
+      if (snap) {
+        var st = clamp((now - snap.start) / snap.dur, 0, 1);
+        var se = easeInOutCubic(st);
+        yaw = snap.fromYaw + snap.dYaw * se;
+        pitch = snap.fromPitch + snap.dPitch * se;
+        if (st >= 1) snap = null;
+        else busy = true;
+      } else if (dragging) {
+        busy = true;
+      } else {
+        /* 慣性 */
+        if (Math.abs(velYaw) > 0.0004 || Math.abs(velPitch) > 0.0004) {
+          yaw += velYaw * dt;
+          pitch += velPitch * dt;
+          velYaw *= Math.pow(0.06, dt);
+          velPitch *= Math.pow(0.06, dt);
+          busy = true;
+        } else {
+          velYaw = 0; velPitch = 0;
+        }
+
+        /* 未操作のあいだだけ、ごくゆっくり自動回転して「回せる」ことを示す */
+        if (autoSpin && !userInteracted) {
+          if (now < autoSpinDeadline) {
+            yaw += AUTO_SPIN_SPEED * dt;
+            busy = true;
+          } else {
+            autoSpin = false;
+          }
+        }
+      }
+
+      drawFrame();
+
+      if (busy) {
+        requestAnimationFrame(frame);
+      } else {
+        running = false;
+      }
+    }
+
+    /* ---------------- ドラッグ操作 ---------------- */
+
+    var DRAG_K = 0.006;   // px -> rad
+
+    function onPointerDown(e) {
+      if (e.button !== undefined && e.button !== 0) return;
+      dragging = true;
+      pointerId = e.pointerId;
+      lastX = e.clientX; lastY = e.clientY; lastT = performance.now();
+      velYaw = 0; velPitch = 0;
+      snap = null;
+      markInteracted();
+      host.classList.add('is-dragging');
+      if (host.setPointerCapture) { try { host.setPointerCapture(e.pointerId); } catch (err) {} }
+      requestRender();
+    }
+
+    function onPointerMove(e) {
+      if (!dragging || (pointerId !== null && e.pointerId !== pointerId)) return;
+      var now = performance.now();
+      var dx = e.clientX - lastX;
+      var dy = e.clientY - lastY;
+      var dt = Math.max((now - lastT) / 1000, 0.001);
+
+      yaw += dx * DRAG_K;
+      pitch = clamp(pitch + dy * DRAG_K, -HALF_PI, HALF_PI);
+
+      velYaw = (dx * DRAG_K) / dt;
+      velPitch = (dy * DRAG_K) / dt;
+
+      lastX = e.clientX; lastY = e.clientY; lastT = now;
+      requestRender();
+    }
+
+    function onPointerUp(e) {
+      if (!dragging || (pointerId !== null && e.pointerId !== pointerId)) return;
+      dragging = false;
+      pointerId = null;
+      host.classList.remove('is-dragging');
+
+      /* 離すのが遅ければ慣性を切る */
+      if (performance.now() - lastT > 90) { velYaw = 0; velPitch = 0; }
+      velYaw = clamp(velYaw, -6, 6);
+      velPitch = clamp(velPitch, -6, 6);
+      requestRender();
+    }
+
+    host.addEventListener('pointerdown', onPointerDown);
+    host.addEventListener('pointermove', onPointerMove);
+    host.addEventListener('pointerup', onPointerUp);
+    host.addEventListener('pointercancel', onPointerUp);
+    host.addEventListener('lostpointercapture', onPointerUp);
+
+    /* キーボード（矢印キーで回す） */
+    host.addEventListener('keydown', function (e) {
+      var step = 0.22;
+      var handled = true;
+      if (e.key === 'ArrowLeft')       yaw -= step;
+      else if (e.key === 'ArrowRight') yaw += step;
+      else if (e.key === 'ArrowUp')    pitch = clamp(pitch - step, -HALF_PI, HALF_PI);
+      else if (e.key === 'ArrowDown')  pitch = clamp(pitch + step, -HALF_PI, HALF_PI);
+      else handled = false;
+
+      if (handled) {
+        e.preventDefault();
+        markInteracted();
+        snap = null;
+        requestRender();
+      }
+    });
+
+    /* ---------------- カテゴリのクリック ---------------- */
+
+    var SNAP_MS = 450;
+
+    function snapTo(catId) {
+      var idx = -1;
+      for (var i = 0; i < DATA.categories.length; i++) {
+        if (DATA.categories[i].id === catId) { idx = i; break; }
+      }
+      if (idx < 0) return false;
+
+      var target = facingAngles(DATA.direction(idx));
+      snap = {
+        fromYaw: yaw,
+        fromPitch: pitch,
+        dYaw: shortestAngle(yaw, target.yaw),
+        dPitch: target.pitch - pitch,
+        start: performance.now(),
+        dur: SNAP_MS
+      };
+      requestRender();
+      return true;
+    }
+
+    labelHost.addEventListener('click', function (e) {
+      var link = e.target.closest ? e.target.closest('.label--cat') : null;
+      if (!link) return;
+      /* 修飾キー付きクリック（別タブで開く等）はブラウザに任せる */
+      if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+
+      e.preventDefault();
+      markInteracted();
+
+      var href = link.getAttribute('href');
+      if (reduceMotion || !snapTo(link.dataset.cat)) {
+        window.location.href = href;
+        return;
+      }
+
+      /* 正面に寄せる演出を見せてから遷移する。
+         描画ループ（rAF）はタブが非表示だと止まるので、遷移はタイマーで行う。 */
+      setTimeout(function () { window.location.href = href; }, SNAP_MS + 30);
+    });
+
+    /* ---------------- その他 ---------------- */
+
+    function markInteracted() {
+      if (userInteracted) return;
+      userInteracted = true;
+      autoSpin = false;
+      var hint = document.getElementById('hint');
+      if (hint) hint.classList.add('is-hidden');
+    }
+
+    var resizeTimer = null;
+    window.addEventListener('resize', function () {
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(resize, 150);
+    });
+
+    /* タブが見えていないあいだは描画しない */
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden) {
+        autoSpin = false;
+      } else {
+        requestRender();
+      }
+    });
+
+    resize();
+    drawFrame();
+
+    return {
+      animateIn: function (duration) {
+        if (reduceMotion) {
+          introScale = 1; introOpacity = 1;
+          autoSpinDeadline = 0;
+          requestRender();
+          return;
+        }
+        intro = { start: performance.now(), dur: duration || 1100 };
+        /* 入場が終わったあと 10 秒ほどだけ自動回転する */
+        autoSpinDeadline = performance.now() + (duration || 1100) + 10000;
+        requestRender();
+      },
+      render: requestRender
+    };
+  }
+
+  /* ---------------- 起動 ---------------- */
+
+  buildFallbackNav();
+
+  if (!hasWebGL()) {
+    document.body.classList.add('no-webgl');
+    window.HIDDSphere = { animateIn: function () {}, render: function () {} };
+  } else {
+    window.HIDDSphere = createSphere();
+  }
+})();

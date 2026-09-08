@@ -1,0 +1,84 @@
+/* HIDD — 共通スタイル（カラートークン・リセット・タイポ） */
+
+:root {
+  --bg:          #06070d;
+  --bg-soft:     #0d1020;
+  --surface:     rgba(255, 255, 255, 0.04);
+  --surface-hi:  rgba(255, 255, 255, 0.08);
+  --border:      rgba(255, 255, 255, 0.12);
+  --border-hi:   rgba(255, 255, 255, 0.28);
+  --fg:          #eef1f8;
+  --fg-mute:     #9aa3bd;
+  --fg-dim:      #6b7490;
+
+  --accent-ai:   #5ac8fa;
+  --accent-xr:   #ff7ac6;
+  --accent-web:  #7affa8;
+  --accent-iot:  #ffc861;
+
+  --accent:      var(--accent-ai); /* ページごとに上書き */
+
+  --font: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Hiragino Kaku Gothic ProN",
+          "Yu Gothic", "Noto Sans JP", Meiryo, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.7;
+}
+
+a { color: inherit; text-decoration: none; }
+
+/* フォーカスリング（キーボード操作用） */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* 視覚的には隠すがスクリーンリーダーには読ませる */
+.visually-hidden {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* 背景のうっすらした発光（ポストプロセスの代替・描画コストゼロ） */
+.bg-glow {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 50% at 50% 42%, rgba(90, 200, 250, 0.10), transparent 70%),
+    radial-gradient(45% 40% at 50% 100%, rgba(122, 255, 168, 0.06), transparent 70%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

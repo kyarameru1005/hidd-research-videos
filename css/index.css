@@ -1,0 +1,273 @@
+/* HIDD — トップページ（球体） */
+
+.page-index {
+  overflow: hidden;
+  height: 100vh;
+  height: 100dvh;
+}
+
+.stage {
+  position: relative;
+  z-index: 1;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(10px, 2.2vh, 22px);
+  padding: 24px clamp(16px, 5vw, 48px);
+}
+
+/* ---------- 球体 ---------- */
+
+.sphere-wrap {
+  position: relative;
+  flex: 0 0 auto;
+  width: min(70vmin, 640px);
+  height: min(70vmin, 640px);
+  /* ラベルが球の外側にはみ出せるようにする */
+  overflow: visible;
+}
+
+.sphere-canvas {
+  position: absolute;
+  /* ラップいっぱいに描かず内側に寄せ、外周の余白をカテゴリラベルの居場所にする。
+     .labels も同じ inset にして、ラベルの座標計算をキャンバス基準のまま使えるようにする。 */
+  inset: 9%;
+  cursor: grab;
+  touch-action: none;      /* ドラッグ時にページがスクロールしないように */
+  border-radius: 50%;
+}
+.sphere-canvas.is-dragging { cursor: grabbing; }
+.sphere-canvas canvas { display: block; width: 100%; height: 100%; }
+
+/* ---------- 3D 座標に追従するラベル ---------- */
+
+.labels {
+  position: absolute;
+  inset: 9%;               /* .sphere-canvas と必ず同じ値にすること */
+  pointer-events: none;    /* 個々のラベルだけ有効化する */
+}
+
+.label {
+  position: absolute;
+  top: 0;
+  left: 0;
+  /* transform は JS が毎フレーム上書きする */
+  will-change: transform, opacity;
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* 中央の HIDD */
+.label--brand {
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  font-size: clamp(28px, 7vmin, 58px);
+  text-indent: 0.22em;     /* letter-spacing の右余白を視覚的に相殺 */
+  color: #fff;
+  text-shadow: 0 0 24px rgba(120, 190, 255, 0.55), 0 0 60px rgba(90, 200, 250, 0.25);
+}
+
+/* カテゴリラベル */
+.label--cat {
+  pointer-events: auto;
+  cursor: pointer;
+  display: block;
+  max-width: min(38vw, 212px);
+  white-space: normal;
+  text-align: center;
+  font-size: clamp(10.5px, 1.7vmin, 13.5px);
+  font-weight: 700;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
+  color: var(--fg);
+  padding: 6px 12px;
+  border: 1px solid var(--cat-accent, var(--border));
+  border-radius: 999px;
+  background: rgba(8, 10, 20, 0.72);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  transition: background-color 0.2s var(--ease), box-shadow 0.2s var(--ease), color 0.2s var(--ease);
+}
+
+.label--cat::before {
+  content: "";
+  display: inline-block;
+  width: 6px; height: 6px;
+  margin-right: 7px;
+  vertical-align: middle;
+  border-radius: 50%;
+  background: var(--cat-accent);
+  box-shadow: 0 0 8px var(--cat-accent);
+}
+
+.label--cat:hover,
+.label--cat.is-front {
+  background: rgba(20, 26, 46, 0.9);
+  box-shadow: 0 0 0 1px var(--cat-accent), 0 6px 26px rgba(0, 0, 0, 0.5);
+}
+.label--cat:hover { color: #fff; }
+
+/* 球の裏側に回ったラベル（JS が付ける） */
+.label.is-back { pointer-events: none; }
+
+/* ---------- 操作ヒント ---------- */
+
+.hint {
+  margin: 0;
+  flex: 0 0 auto;
+  font-size: 13px;
+  color: var(--fg-dim);
+  letter-spacing: 0.04em;
+  transition: opacity 0.5s var(--ease);
+}
+.hint.is-hidden { opacity: 0; }
+
+.hint__icon {
+  display: inline-block;
+  width: 16px; height: 16px;
+  margin-right: 6px;
+  vertical-align: -3px;
+  border: 1.5px solid var(--fg-dim);
+  border-radius: 50%;
+  position: relative;
+}
+.hint__icon::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-top: 1.5px solid var(--fg-dim);
+  border-radius: 50%;
+  transform: rotate(-30deg);
+}
+
+/* ---------- フォールバック / キーボード用ナビ ---------- */
+
+.fallback-nav {
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: 900px;
+  text-align: center;
+}
+
+.fallback-nav__title {
+  margin: 0 0 8px;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--fg-dim);
+  text-transform: uppercase;
+}
+
+.fallback-nav__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.fallback-nav__link {
+  display: inline-block;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--fg-mute);
+  padding: 5px 11px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease), background-color 0.2s var(--ease);
+}
+.fallback-nav__link:hover {
+  color: #fff;
+  border-color: var(--cat-accent, var(--border-hi));
+  background: var(--surface);
+}
+
+/* WebGL が使えないときは球体を隠してカード表示に切り替える */
+.no-webgl .sphere-wrap,
+.no-webgl .hint { display: none; }
+
+.no-webgl .fallback-nav__title { font-size: 13px; letter-spacing: 0.08em; margin-bottom: 20px; }
+.no-webgl .fallback-nav__list { flex-direction: column; align-items: stretch; gap: 12px; }
+.no-webgl .fallback-nav__link {
+  font-size: 15px;
+  font-weight: 700;
+  padding: 18px 20px;
+  border-radius: 14px;
+  color: var(--fg);
+  border-color: var(--cat-accent);
+}
+.no-webgl .no-webgl-note {
+  display: block;
+  margin: 0 auto 28px;
+  max-width: 460px;
+  font-size: 13px;
+  color: var(--fg-dim);
+}
+
+.no-webgl-note { display: none; }
+
+/* ---------- 入場アニメーション ---------- */
+
+.intro-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  background: var(--bg);
+  display: grid;
+  place-items: center;
+  transition: opacity 0.7s var(--ease);
+}
+.intro-veil.is-done {
+  opacity: 0;
+  pointer-events: none;
+}
+.intro-veil.is-removed { display: none; }
+
+.intro-spark {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 30px 8px rgba(120, 190, 255, 0.75);
+  animation: intro-spark 1100ms var(--ease) forwards;
+}
+
+@keyframes intro-spark {
+  0%   { transform: scale(0.2); opacity: 0; }
+  35%  { transform: scale(1);   opacity: 1; }
+  100% { transform: scale(34);  opacity: 0; }
+}
+
+/* イントロ中は本体を伏せておく */
+.stage { opacity: 0; transition: opacity 0.8s var(--ease); }
+.is-revealed .stage { opacity: 1; }
+
+/* ラベルの opacity は js/sphere.js が毎フレーム inline で書く。
+   ここで transition を掛けると毎フレームの書き換えに追従できず、
+   文字が薄いまま止まって見えるので指定しない。入場フェードも JS 側で行う。 */
+
+.hint, .fallback-nav {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.7s var(--ease), transform 0.7s var(--ease);
+}
+.is-revealed .hint,
+.is-revealed .fallback-nav { opacity: 1; transform: none; }
+.is-revealed .hint.is-hidden { opacity: 0; }
+
+/* モーション抑制設定では演出を出さずに即表示する */
+@media (prefers-reduced-motion: reduce) {
+  .intro-veil { display: none; }
+  .stage, .hint, .fallback-nav { opacity: 1; transform: none; }
+}
+
+/* ---------- 画面が低いとき ---------- */
+
+@media (max-height: 640px) {
+  .sphere-wrap { width: min(62vmin, 460px); height: min(62vmin, 460px); }
+  .fallback-nav__title { display: none; }
+}
