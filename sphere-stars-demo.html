@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>星と自動再生 デモ — HIDD</title>
+<link rel="stylesheet" href="css/common.css">
+<link rel="stylesheet" href="css/sphere-stars-demo.css">
+</head>
+<body class="page-stars">
+
+<div class="bg-glow"></div>
+
+<header class="sd-header">
+  <a class="sd-back" href="index.html">&larr; 本番サイトに戻る</a>
+  <h1 class="sd-title">星 ＋ 放置時の自動再生 デモ</h1>
+  <p class="sd-lead">
+    動画 1 本を 1 つの星として球面に配置し、同じカテゴリの星を線で結んで星座にしています。
+    <strong>一定時間操作がないと球体が回り出し、ランダムに星を選び、そこからカードが生えて動画が再生されます。</strong>
+    再生が終わると次の動画へ進みます。どこかを触れば即座に止まります。
+  </p>
+  <p class="sd-note">
+    検討用のページです。本番の <code>index.html</code> / <code>category.html</code> には手を入れていません。<br>
+    動画は動作確認用に自動生成した色パターン（カテゴリごとに色、1 本ずつ長さが違う）です。実物ではありません。
+  </p>
+</header>
+
+<div class="sd-controls">
+  <div class="sd-controls__inner">
+    <div class="sd-ctl">
+      <span class="sd-ctl__label">放置してから回り出すまで</span>
+      <div class="sd-seg" id="segIdle">
+        <button type="button" data-v="5000" aria-pressed="true">5 秒</button>
+        <button type="button" data-v="15000" aria-pressed="false">15 秒</button>
+        <button type="button" data-v="60000" aria-pressed="false">1 分</button>
+      </div>
+    </div>
+    <div class="sd-ctl">
+      <span class="sd-ctl__label">回り出してから再生まで</span>
+      <div class="sd-seg" id="segPlay">
+        <button type="button" data-v="4000" aria-pressed="true">4 秒</button>
+        <button type="button" data-v="15000" aria-pressed="false">15 秒</button>
+        <button type="button" data-v="30000" aria-pressed="false">30 秒</button>
+      </div>
+    </div>
+    <div class="sd-ctl">
+      <span class="sd-ctl__label">星座線</span>
+      <div class="sd-seg" id="segLines">
+        <button type="button" data-v="on" aria-pressed="true">あり</button>
+        <button type="button" data-v="off" aria-pressed="false">なし</button>
+      </div>
+    </div>
+    <div class="sd-ctl">
+      <span class="sd-ctl__label">またたき</span>
+      <div class="sd-seg" id="segTwinkle">
+        <button type="button" data-v="on" aria-pressed="true">あり</button>
+        <button type="button" data-v="off" aria-pressed="false">なし</button>
+      </div>
+    </div>
+    <div class="sd-ctl">
+      <span class="sd-ctl__label">音</span>
+      <div class="sd-seg" id="segSound">
+        <button type="button" data-v="off" aria-pressed="true">ミュート</button>
+        <button type="button" data-v="on" aria-pressed="false">あり</button>
+      </div>
+    </div>
+    <div class="sd-ctl sd-ctl--push">
+      <button class="sd-btn" type="button" id="btnPlayNow">今すぐ 1 本再生</button>
+      <button class="sd-btn" type="button" id="btnReset">履歴をリセット</button>
+    </div>
+  </div>
+</div>
+
+<main class="sd-stage" id="stage">
+  <div class="sd-status" id="status">操作がないと <b id="statusIdle">5</b> 秒後に回り始めます</div>
+
+  <div class="sphere-wrap" id="sphereWrap">
+    <div class="sphere-canvas" id="sphereCanvas"
+         role="application"
+         aria-label="星の球体。ドラッグまたは矢印キーで回転します。"
+         tabindex="0"></div>
+
+    <!-- 星座線（球体の回転に追従して毎フレーム描き直す） -->
+    <svg class="constellations" id="constellations" aria-hidden="true"></svg>
+
+    <!-- 星とラベル（3D 座標に追従する HTML 要素） -->
+    <div class="overlay" id="overlay" aria-hidden="true">
+      <div class="brand" data-anchor="brand">HIDD</div>
+    </div>
+
+    <!-- 星から生えてくるカード -->
+    <div class="grow" id="grow" hidden>
+      <div class="grow__card" id="growCard">
+        <div class="grow__head">
+          <span class="grow__lab" id="growLab"></span>
+          <button class="grow__close" type="button" id="growClose" aria-label="閉じる">&times;</button>
+        </div>
+        <h2 class="grow__title" id="growTitle"></h2>
+        <div class="grow__player" id="growPlayer"></div>
+        <p class="grow__summary" id="growSummary"></p>
+        <div class="grow__bar"><span id="growProgress"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <nav class="sd-nav" aria-label="カテゴリ">
+    <ul id="navList"></ul>
+  </nav>
+</main>
+
+<div class="fallback" id="fallback" hidden>
+  このブラウザでは WebGL が使えないため、球体を表示できません。
+</div>
+
+<script src="vendor/three.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/texture-lab.js"></script>
+<script src="js/sphere-stars-demo.js"></script>
+</body>
+</html>

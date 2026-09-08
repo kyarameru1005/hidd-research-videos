@@ -1,0 +1,226 @@
+/* HIDD — 星 + 放置時自動再生 デモ（検討用） */
+
+.page-stars { overflow-x: hidden; }
+
+/* ---------------- ページ外枠 ---------------- */
+
+.sd-header { max-width: 1180px; margin: 0 auto; padding: clamp(24px, 5vh, 48px) clamp(20px, 5vw, 40px) 0; }
+.sd-back { font-size: 13px; color: var(--fg-mute); }
+.sd-back:hover { color: #fff; }
+.sd-title { margin: 16px 0 10px; font-size: clamp(21px, 3.2vw, 32px); font-weight: 800; }
+.sd-lead { margin: 0; max-width: 74ch; color: var(--fg-mute); font-size: 14px; }
+.sd-note {
+  margin: 14px 0 0; max-width: 74ch; font-size: 12.5px; color: var(--fg-dim);
+  padding: 10px 14px; border-left: 2px solid var(--border-hi);
+  background: var(--surface); border-radius: 0 8px 8px 0;
+}
+
+.sd-controls {
+  position: sticky; top: 0; z-index: 30;
+  margin-top: 24px; padding: 12px clamp(20px, 5vw, 40px);
+  background: rgba(6, 7, 13, 0.9);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);
+}
+.sd-controls__inner {
+  max-width: 1180px; margin: 0 auto;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px;
+}
+.sd-ctl { display: flex; align-items: center; gap: 8px; }
+.sd-ctl--push { margin-left: auto; gap: 8px; }
+.sd-ctl__label { font-size: 11px; letter-spacing: 0.1em; color: var(--fg-dim); white-space: nowrap; }
+
+.sd-seg { display: flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+.sd-seg button {
+  font: inherit; font-size: 12px; color: var(--fg-mute);
+  padding: 5px 12px; background: transparent; border: 0; cursor: pointer;
+  transition: background-color .15s, color .15s;
+}
+.sd-seg button + button { border-left: 1px solid var(--border); }
+.sd-seg button:hover { color: #fff; }
+.sd-seg button[aria-pressed="true"] { background: var(--surface-hi); color: #fff; }
+
+.sd-btn {
+  font: inherit; font-size: 12px; color: var(--fg);
+  padding: 6px 14px; border: 1px solid var(--border-hi); border-radius: 999px;
+  background: var(--surface); cursor: pointer;
+  transition: background-color .15s, border-color .15s;
+}
+.sd-btn:hover { background: var(--surface-hi); border-color: #fff; }
+
+/* ---------------- 舞台 ---------------- */
+
+.sd-stage {
+  position: relative; z-index: 1;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 14px; padding: 20px clamp(16px, 5vw, 40px) 48px;
+}
+
+.sd-status {
+  font-size: 12px; color: var(--fg-dim); letter-spacing: 0.04em;
+  min-height: 1.4em; text-align: center;
+}
+.sd-status b { color: var(--fg-mute); font-weight: 700; }
+.sd-status.is-live { color: var(--accent-ai); }
+
+.sphere-wrap {
+  position: relative;
+  width: min(66vmin, 560px);
+  height: min(66vmin, 560px);
+  flex: 0 0 auto;
+}
+.sphere-canvas {
+  position: absolute; inset: 8%;
+  cursor: grab; touch-action: none; border-radius: 50%;
+}
+.sphere-canvas.is-dragging { cursor: grabbing; }
+.sphere-canvas canvas { display: block; width: 100%; height: 100%; }
+
+.constellations { position: absolute; inset: 8%; pointer-events: none; overflow: visible; }
+.constellations line {
+  stroke-width: 1.2;
+  stroke-linecap: round;
+  transition: opacity .2s linear;
+}
+
+.overlay { position: absolute; inset: 8%; pointer-events: none; }
+
+/* カードが開いているあいだは球体と星を落ち着かせる */
+.sphere-wrap.is-playing .overlay,
+.sphere-wrap.is-playing .constellations { opacity: .35; transition: opacity .4s var(--ease); }
+.sphere-wrap.is-playing .sphere-canvas { opacity: .5; transition: opacity .4s var(--ease); }
+.sphere-wrap .overlay,
+.sphere-wrap .constellations,
+.sphere-wrap .sphere-canvas { transition: opacity .4s var(--ease); }
+
+/* ---------------- 星 ---------------- */
+
+.star {
+  position: absolute; top: 0; left: 0;
+  width: 10px; height: 10px; margin: -5px 0 0 -5px;
+  pointer-events: auto; cursor: pointer;
+  will-change: transform, opacity;
+}
+.star::before {           /* 光の芯 */
+  content: ""; position: absolute; inset: 3px;
+  border-radius: 50%; background: #fff;
+}
+.star::after {            /* にじみ */
+  content: ""; position: absolute; inset: -7px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--star) 0%, transparent 68%);
+  opacity: 0.85;
+}
+.star.is-twinkle::after { animation: twinkle var(--dur, 3.4s) ease-in-out infinite; }
+.star.is-twinkle::before { animation: twinkle-core var(--dur, 3.4s) ease-in-out infinite; }
+@keyframes twinkle       { 0%,100% { opacity: .55; transform: scale(.85); } 50% { opacity: 1; transform: scale(1.15); } }
+@keyframes twinkle-core  { 0%,100% { opacity: .75; } 50% { opacity: 1; } }
+
+.star:hover::after { opacity: 1; transform: scale(1.5); }
+.star.is-picked::after { transform: scale(2.1); opacity: 1; }
+.star.is-back { pointer-events: none; }
+
+/* 星に添えるタイトル（正面付近だけ出る） */
+.star__tip {
+  position: absolute; left: 50%; top: 14px; transform: translateX(-50%);
+  white-space: nowrap; font-size: 11px; font-weight: 700; color: #fff;
+  background: rgba(8, 10, 20, .82); border: 1px solid var(--star);
+  padding: 3px 9px; border-radius: 999px;
+  opacity: 0; transition: opacity .18s var(--ease);
+  pointer-events: none;
+}
+.star:hover .star__tip { opacity: 1; }
+
+/* ---------------- HIDD とカテゴリ名 ---------------- */
+
+.brand {
+  position: absolute; top: 0; left: 0;
+  font-weight: 800; letter-spacing: .2em; text-indent: .2em;
+  font-size: clamp(22px, 5vmin, 44px); color: #fff;
+  text-shadow: 0 0 20px rgba(120,190,255,.5), 0 0 52px rgba(90,200,250,.22);
+  will-change: transform, opacity; pointer-events: none;
+}
+.cat-name {
+  position: absolute; top: 0; left: 0;
+  font-size: 12px; font-weight: 700; letter-spacing: .08em;
+  color: var(--cat); text-shadow: 0 0 14px rgba(0,0,0,.9);
+  white-space: nowrap; will-change: transform, opacity; pointer-events: none;
+}
+
+/* ---------------- 星から生えるカード ---------------- */
+
+.grow {
+  /* 星は JS が z-index を最大 200 まで振るので、カードは必ずその上に置く */
+  position: absolute; inset: 0; z-index: 500;
+  display: grid; place-items: center;
+  pointer-events: none;
+}
+.grow[hidden] { display: none; }
+
+.grow__card {
+  pointer-events: auto;
+  width: min(94%, 460px);
+  background: rgba(10, 13, 24, .94);
+  border: 1px solid var(--cat, var(--border-hi));
+  border-radius: 16px;
+  padding: 14px 16px 16px;
+  box-shadow: 0 24px 70px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.04);
+  transform: scale(.04);
+  opacity: 0;
+  transition: transform .5s cubic-bezier(.16,1,.3,1), opacity .28s ease-out;
+}
+.grow.is-open .grow__card { transform: scale(1); opacity: 1; }
+
+.grow__head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.grow__lab { flex: 1; font-size: 11px; letter-spacing: .12em; color: var(--cat); font-weight: 700; }
+.grow__close {
+  width: 26px; height: 26px; font-size: 17px; line-height: 1;
+  color: var(--fg-mute); background: transparent;
+  border: 1px solid var(--border); border-radius: 7px; cursor: pointer;
+}
+.grow__close:hover { color: #fff; border-color: var(--border-hi); }
+
+.grow__title { margin: 0 0 10px; font-size: 15px; font-weight: 700; line-height: 1.5; }
+
+.grow__player {
+  position: relative; width: 100%; aspect-ratio: 16 / 9;
+  background: #000; border-radius: 9px; overflow: hidden;
+}
+.grow__player video,
+.grow__player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+.grow__player .no-file {
+  position: absolute; inset: 0; display: grid; place-items: center; padding: 16px;
+  font-size: 12px; color: var(--fg-dim); text-align: center; line-height: 1.7;
+}
+
+.grow__summary { margin: 10px 0 0; font-size: 12.5px; color: var(--fg-mute); line-height: 1.7; }
+
+.grow__bar { margin-top: 10px; height: 2px; background: rgba(255,255,255,.12); border-radius: 2px; overflow: hidden; }
+.grow__bar span { display: block; height: 100%; width: 0; background: var(--cat); transition: width .2s linear; }
+
+/* ---------------- 下部ナビ ---------------- */
+
+.sd-nav ul {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
+}
+.sd-nav li { font-size: 11.5px; color: var(--fg-mute); }
+.sd-nav .chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 5px 11px; border: 1px solid var(--border); border-radius: 999px;
+}
+.sd-nav .chip::before {
+  content: ""; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--cat); box-shadow: 0 0 8px var(--cat);
+}
+.sd-nav .chip b { color: var(--fg-dim); font-weight: 400; }
+
+.fallback {
+  max-width: 900px; margin: 40px auto; padding: 24px;
+  border: 1px solid var(--border); border-radius: 14px; color: var(--fg-mute);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .star.is-twinkle::before, .star.is-twinkle::after { animation: none; }
+  .grow__card { transition: none; }
+}
