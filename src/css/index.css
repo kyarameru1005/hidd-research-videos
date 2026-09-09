@@ -129,19 +129,6 @@
   /* opacity は JS が毎フレーム書く */
 }
 
-.star--major.is-focused::after { transform: scale(1.5); opacity: 1; }
-.star--major.is-focused .star__spikes { transform: scale(1.5); opacity: 1; }
-.star--major.is-focused .star__name {
-  color: var(--star);
-}
-
-.star.is-dim { filter: saturate(.35) brightness(.55); }
-.star.is-dim .star__name { opacity: 0 !important; }
-
-.star.is-focused:not(.star--major) { width: 14px; height: 14px; margin: -7px 0 0 -7px; }
-.star.is-focused:not(.star--major)::after { inset: -10px; opacity: 1; }
-.star.is-focused .star__tip { opacity: 1; }
-
 .star__tip {
   position: absolute;
   max-width: 190px;
@@ -245,13 +232,6 @@
 }
 .status b { color: var(--fg-mute); font-weight: 700; }
 .status.is-live { color: var(--accent-ai); }
-.status__link {
-  margin-left: 10px;
-  color: var(--fg-mute);
-  border-bottom: 1px solid currentColor;
-  padding-bottom: 1px;
-}
-.status__link:hover { color: #fff; }
 
 /* ---------- フォールバック / キーボード用ナビ ---------- */
 

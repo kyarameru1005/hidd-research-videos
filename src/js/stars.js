@@ -181,7 +181,7 @@
     el.style.setProperty('--star', cat.accent);
     el.style.setProperty('--dur', '4.2s');
     el.setAttribute('role', 'button');
-    el.setAttribute('aria-label', cat.label + ' を選ぶ');
+    el.setAttribute('aria-label', cat.label + ' の動画一覧を開く');
 
     var spikes = document.createElement('span');
     spikes.className = 'star__spikes';
@@ -196,14 +196,15 @@
     var a = addAnchor(el, DATA.direction(ci), MAJOR_R, 'major');
     a.nameEl = name;
 
-    MAJORS.push({ cat: cat, ci: ci, el: el, anchor: a });
+    var major = { cat: cat, ci: ci, el: el, anchor: a };
+    MAJORS.push(major);
     /* 吹き出しを星座の中心から外向きに出すため、親を覚えさせる */
     ENTRIES.forEach(function (x) { if (x.catIndex === ci) x.majorAnchor = a; });
 
     el.addEventListener('click', function (e) {
       e.stopPropagation();
       noteActivity();
-      focusCategory(ci);
+      goToCategory(major);
     });
   });
 
@@ -416,34 +417,18 @@
     requestRender();
   }
 
-  /* ---------------- カテゴリの選択（1 等星） ---------------- */
+  /* ---------------- カテゴリの選択（1 等星） ----------------
+     押すと、その星を正面へ寄せてからカテゴリの一覧ページへ移動する。
+     rAF はタブが非表示だと止まるので、遷移はスナップの完了ではなく
+     setTimeout で出す（CLAUDE.md の制約と同じ理由）。 */
 
-  var focused = -1;
-
-  function focusCategory(ci) {
-    focused = (focused === ci) ? -1 : ci;
-    applyFocus();
-    if (focused >= 0) snapTo(DATA.direction(focused));
-    requestRender();
-  }
-
-  function applyFocus() {
-    MAJORS.forEach(function (m) {
-      m.el.classList.toggle('is-focused', m.ci === focused);
-      m.el.classList.toggle('is-dim', focused >= 0 && m.ci !== focused);
-    });
-    ENTRIES.forEach(function (x) {
-      x.el.classList.toggle('is-focused', x.catIndex === focused);
-      x.el.classList.toggle('is-dim', focused >= 0 && x.catIndex !== focused);
-    });
-    sphereWrap.classList.toggle('has-focus', focused >= 0);
-    updateStatus();
-  }
-
-  function clearFocus() {
-    if (focused < 0) return;
-    focused = -1;
-    applyFocus();
+  function goToCategory(major) {
+    major.el.classList.add('is-picked');
+    snapTo(DATA.direction(major.ci));
+    setPhase('idle');
+    setTimeout(function () {
+      window.location.href = 'category.html?cat=' + encodeURIComponent(major.cat.id);
+    }, SNAP_MS + 30);
   }
 
   /* ---------------- 再生 ---------------- */
@@ -477,7 +462,6 @@
   }
 
   function pickAndPlay(entry) {
-    clearFocus();
     markPlayed(entry);
     current = entry;
     ENTRIES.forEach(function (x) { x.el.classList.toggle('is-picked', x === entry); });
@@ -668,13 +652,7 @@
 
   function updateStatus() {
     if (!statusEl) return;
-    if (focused >= 0) {
-      var cat = DATA.categories[focused];
-      statusEl.classList.add('is-live');
-      statusEl.innerHTML = '<b>' + cat.label + '</b> を選択中 — 周りの星が ' +
-        cat.videos.length + ' 本の動画です（もう一度押すと解除）' +
-        ' <a class="status__link" href="category.html?cat=' + encodeURIComponent(cat.id) + '">一覧ページを開く →</a>';
-    } else if (phase === 'playing') {
+    if (phase === 'playing') {
       statusEl.classList.add('is-live');
       statusEl.innerHTML = '再生中: <b>' + (current ? current.video.title : '') + '</b>';
     } else if (phase === 'tour') {
@@ -727,7 +705,6 @@
     dragging = true; pointerId = e.pointerId;
     lastX = e.clientX; lastY = e.clientY; lastT = performance.now();
     velYaw = 0; velPitch = 0; snap = null;
-    clearFocus();
     noteActivity();
     host.classList.add('is-dragging');
     if (host.setPointerCapture) { try { host.setPointerCapture(e.pointerId); } catch (err) {} }
