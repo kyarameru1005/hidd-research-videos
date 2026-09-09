@@ -109,6 +109,15 @@ test('重要な処理を requestAnimationFrame の完了に紐づけていない
   }
 });
 
+test('横送りの状態更新を scroll イベントだけに任せていない', () => {
+  // scroll も描画フレーム待ちなので、背景タブでは飛んでこない。
+  // 送りボタンが無効のまま固まるのを防ぐため setTimeout でも直すこと。
+  const code = read('src/js/category.js');
+  assert.ok(/setTimeout\(\s*updateNav/.test(code),
+    'src/js/category.js が updateNav を setTimeout で呼んでいない。' +
+    'scroll イベントはタブ非表示だと来ないので、ボタンが押せなくなる');
+});
+
 test('回転の計算が 1 か所にまとまっている（重複させない）', () => {
   for (const f of ['src/js/sphere.js', 'demo/js/stars.js']) {
     assert.ok(!/^\s*function facingAngles/m.test(read(f)),
