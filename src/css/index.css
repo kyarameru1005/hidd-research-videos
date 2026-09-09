@@ -1,4 +1,4 @@
-/* HIDD — トップページ（球体） */
+/* HIDD — トップページ（星の球体 ＋ 自動再生） */
 
 .page-index {
   overflow: hidden;
@@ -24,17 +24,18 @@
 .sphere-wrap {
   position: relative;
   flex: 0 0 auto;
-  width: min(73vmin, 620px);
-  height: min(73vmin, 620px);
-  /* ラベルが球の外側にはみ出せるようにする */
+  width: min(70vmin, 580px);
+  height: min(70vmin, 580px);
+  /* 星と吹き出しが球の外側へはみ出せるようにする */
   overflow: visible;
 }
 
 .sphere-canvas {
   position: absolute;
-  /* ラップいっぱいに描かず内側に寄せ、外周の余白をカテゴリラベルの居場所にする。
-     .labels も同じ inset にして、ラベルの座標計算をキャンバス基準のまま使えるようにする。 */
-  inset: 6%;
+  /* ラップいっぱいに描かず内側に寄せ、外周を星の吹き出しの居場所にする。
+     .overlay と .constellations も同じ inset にして、
+     座標計算をキャンバス基準のまま使えるようにする。 */
+  inset: 8%;
   cursor: grab;
   touch-action: none;      /* ドラッグ時にページがスクロールしないように */
   border-radius: 50%;
@@ -42,106 +43,215 @@
 .sphere-canvas.is-dragging { cursor: grabbing; }
 .sphere-canvas canvas { display: block; width: 100%; height: 100%; }
 
-/* ---------- 3D 座標に追従するラベル ---------- */
-
-.labels {
+.constellations {
   position: absolute;
-  inset: 6%;               /* .sphere-canvas と必ず同じ値にすること */
-  pointer-events: none;    /* 個々のラベルだけ有効化する */
+  inset: 8%;               /* .sphere-canvas と必ず同じ値にすること */
+  pointer-events: none;
+  overflow: visible;
+}
+.constellations line {
+  stroke-width: 1.2;
+  stroke-linecap: round;
 }
 
-.label {
+.overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  /* transform は JS が毎フレーム上書きする */
-  will-change: transform, opacity;
-  white-space: nowrap;
-  user-select: none;
+  inset: 8%;               /* .sphere-canvas と必ず同じ値にすること */
+  pointer-events: none;    /* 個々の星だけ有効化する */
 }
 
-/* 中央の HIDD */
-.label--brand {
-  font-weight: 800;
-  letter-spacing: 0.22em;
-  font-size: clamp(28px, 7vmin, 58px);
-  text-indent: 0.22em;     /* letter-spacing の右余白を視覚的に相殺 */
-  color: #fff;
-  text-shadow: 0 0 24px rgba(120, 190, 255, 0.55), 0 0 60px rgba(90, 200, 250, 0.25);
-}
+/* カードが開いているあいだは球体と星を落ち着かせる */
+.sphere-wrap .overlay,
+.sphere-wrap .constellations,
+.sphere-wrap .sphere-canvas { transition: opacity 0.4s var(--ease); }
+.sphere-wrap.is-playing .overlay,
+.sphere-wrap.is-playing .constellations { opacity: 0.35; }
+.sphere-wrap.is-playing .sphere-canvas { opacity: 0.5; }
 
-/* カテゴリラベル */
-.label--cat {
+/* ---------- 星 ----------
+   星ひとつの opacity / transform は js/stars.js が毎フレーム inline で書く。
+   ここで transition を掛けると追従できず中途半端な値で止まるので指定しない。 */
+
+.star {
+  position: absolute;
+  top: 0; left: 0;
+  width: 10px; height: 10px;
+  margin: -5px 0 0 -5px;
   pointer-events: auto;
   cursor: pointer;
-  display: block;
-  max-width: min(38vw, 212px);
-  white-space: normal;
-  text-align: center;
-  font-size: clamp(10.5px, 1.7vmin, 13.5px);
-  font-weight: 700;
-  line-height: 1.45;
-  letter-spacing: 0.01em;
-  color: var(--fg);
-  padding: 6px 12px;
-  border: 1px solid var(--cat-accent, var(--border));
-  border-radius: 999px;
-  background: rgba(8, 10, 20, 0.72);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
-  transition: background-color 0.2s var(--ease), box-shadow 0.2s var(--ease), color 0.2s var(--ease);
+  will-change: transform, opacity;
 }
-
-.label--cat::before {
-  content: "";
-  display: inline-block;
-  width: 6px; height: 6px;
-  margin-right: 7px;
-  vertical-align: middle;
+.star::before {           /* 光の芯 */
+  content: ""; position: absolute; inset: 2px;
+  border-radius: 50%; background: #fff;
+}
+.star::after {            /* にじみ */
+  content: ""; position: absolute; inset: -9px;
   border-radius: 50%;
-  background: var(--cat-accent);
-  box-shadow: 0 0 8px var(--cat-accent);
+  background: radial-gradient(circle, var(--star) 0%, transparent 68%);
+  opacity: .8;
+  transition: transform .25s var(--ease), opacity .25s var(--ease);
+}
+.star.is-twinkle::after { animation: twinkle var(--dur, 3.4s) ease-in-out infinite; }
+.star.is-twinkle::before { animation: twinkle-core var(--dur, 3.4s) ease-in-out infinite; }
+@keyframes twinkle       { 0%,100% { opacity: .55; transform: scale(.85); } 50% { opacity: 1; transform: scale(1.15); } }
+@keyframes twinkle-core  { 0%,100% { opacity: .75; } 50% { opacity: 1; } }
+
+.star:hover::after { opacity: 1; transform: scale(1.5); }
+.star.is-picked::after { transform: scale(2.1); opacity: 1; }
+.star.is-back { pointer-events: none; }
+
+/* 1 等星（カテゴリ） */
+.star--major {
+  width: 18px; height: 18px; margin: -9px 0 0 -9px;
+  z-index: 3;
+}
+.star--major::before { inset: 6px; box-shadow: 0 0 10px 2px #fff; }
+.star--major::after  { inset: -16px; opacity: .95; }
+
+.star__spikes {
+  position: absolute; inset: -14px;
+  background:
+    linear-gradient(to right, transparent 47%, var(--star) 50%, transparent 53%),
+    linear-gradient(to bottom, transparent 47%, var(--star) 50%, transparent 53%);
+  opacity: .7;
+  transition: transform .25s var(--ease), opacity .25s var(--ease);
+}
+.star--major:hover .star__spikes { opacity: 1; transform: scale(1.25); }
+
+.star__name {
+  position: absolute; top: 18px; left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 12px; font-weight: 700; letter-spacing: .04em;
+  color: #fff; text-shadow: 0 1px 8px rgba(0,0,0,.9);
+  z-index: 5;
+  /* opacity は JS が毎フレーム書く */
 }
 
-.label--cat:hover,
-.label--cat.is-front {
-  background: rgba(20, 26, 46, 0.9);
-  box-shadow: 0 0 0 1px var(--cat-accent), 0 6px 26px rgba(0, 0, 0, 0.5);
+.star--major.is-focused::after { transform: scale(1.5); opacity: 1; }
+.star--major.is-focused .star__spikes { transform: scale(1.5); opacity: 1; }
+.star--major.is-focused .star__name {
+  color: var(--star);
 }
-.label--cat:hover { color: #fff; }
 
-/* 球の裏側に回ったラベル（JS が付ける） */
-.label.is-back { pointer-events: none; }
+.star.is-dim { filter: saturate(.35) brightness(.55); }
+.star.is-dim .star__name { opacity: 0 !important; }
 
-/* ---------- 操作ヒント ---------- */
+.star.is-focused:not(.star--major) { width: 14px; height: 14px; margin: -7px 0 0 -7px; }
+.star.is-focused:not(.star--major)::after { inset: -10px; opacity: 1; }
+.star.is-focused .star__tip { opacity: 1; }
 
-.hint {
-  margin: 0;
-  flex: 0 0 auto;
-  font-size: 13px;
-  color: var(--fg-dim);
-  letter-spacing: 0.04em;
-  transition: opacity 0.5s var(--ease);
-}
-.hint.is-hidden { opacity: 0; }
-
-.hint__icon {
-  display: inline-block;
-  width: 16px; height: 16px;
-  margin-right: 6px;
-  vertical-align: -3px;
-  border: 1.5px solid var(--fg-dim);
-  border-radius: 50%;
-  position: relative;
-}
-.hint__icon::after {
-  content: "";
+.star__tip {
   position: absolute;
-  inset: 3px;
-  border-top: 1.5px solid var(--fg-dim);
-  border-radius: 50%;
-  transform: rotate(-30deg);
+  max-width: 190px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(8, 10, 20, .92);
+  border: 1px solid var(--border);
+  font-size: 11px; line-height: 1.5; color: var(--fg-mute);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  opacity: 0;
+  transition: opacity .2s var(--ease);
+  pointer-events: none;
 }
+.star__tip--below { top: 15px; bottom: auto; left: 50%; right: auto; transform: translateX(-50%); }
+.star__tip--above { top: auto; bottom: 15px; left: 50%; right: auto; transform: translateX(-50%); }
+.star__tip--right { top: 50%; bottom: auto; left: 16px; right: auto; transform: translateY(-50%); }
+.star__tip--left  { top: 50%; bottom: auto; left: auto; right: 16px; transform: translateY(-50%); }
+.star:hover .star__tip { opacity: 1; }
+
+/* ---------- 中央の HIDD ---------- */
+
+.brand {
+  position: absolute;
+  top: 0; left: 0;
+  font-size: clamp(26px, 5.4vmin, 48px);
+  font-weight: 800;
+  letter-spacing: .16em;
+  color: #fff;
+  text-shadow: 0 2px 24px rgba(0, 0, 0, .8);
+  pointer-events: none;
+  white-space: nowrap;
+  will-change: transform, opacity;
+  /* transform / opacity は JS が毎フレーム書くので transition を掛けない */
+}
+
+/* ---------- 星から生えるカード ---------- */
+
+.grow {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 500;
+}
+.grow[hidden] { display: none; }
+
+.grow__card {
+  width: min(430px, 88%);
+  padding: 14px;
+  background: rgba(9, 11, 22, .96);
+  border: 1px solid var(--border-hi);
+  border-radius: 14px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .65);
+  transform: scale(.4);
+  opacity: 0;
+  transition: transform .38s var(--ease), opacity .3s var(--ease);
+}
+.grow.is-open .grow__card { transform: scale(1); opacity: 1; }
+
+.grow__head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.grow__lab { flex: 1; font-size: 11px; letter-spacing: .12em; color: var(--cat); font-weight: 700; }
+.grow__close {
+  flex: 0 0 auto; width: 28px; height: 28px; font-size: 18px; line-height: 1;
+  color: var(--fg-mute); background: transparent;
+  border: 1px solid var(--border); border-radius: 7px; cursor: pointer;
+}
+.grow__close:hover { color: #fff; border-color: var(--border-hi); }
+
+.grow__title { margin: 0 0 10px; font-size: 15px; font-weight: 700; line-height: 1.5; }
+
+.grow__player {
+  position: relative; width: 100%; aspect-ratio: 16 / 9;
+  background: #000; border-radius: 9px; overflow: hidden;
+}
+@supports not (aspect-ratio: 16 / 9) {
+  .grow__player { height: 0; padding-bottom: 56.25%; }
+}
+.grow__player video,
+.grow__player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+.grow__player .no-file {
+  position: absolute; inset: 0; display: grid; place-items: center; padding: 16px;
+  font-size: 12px; color: var(--fg-dim); text-align: center; line-height: 1.7;
+  background: rgba(0, 0, 0, .55);
+}
+
+.grow__summary { margin: 10px 0 0; font-size: 12.5px; color: var(--fg-mute); line-height: 1.7; }
+
+.grow__bar { margin-top: 10px; height: 2px; background: rgba(255,255,255,.12); border-radius: 2px; overflow: hidden; }
+.grow__bar span { display: block; height: 100%; width: 0; background: var(--cat); transition: width .2s linear; }
+
+/* ---------- 状態表示 ---------- */
+
+.status {
+  flex: 0 0 auto;
+  margin: 0;
+  min-height: 1.4em;
+  font-size: 12px;
+  letter-spacing: .04em;
+  color: var(--fg-dim);
+  text-align: center;
+}
+.status b { color: var(--fg-mute); font-weight: 700; }
+.status.is-live { color: var(--accent-ai); }
+.status__link {
+  margin-left: 10px;
+  color: var(--fg-mute);
+  border-bottom: 1px solid currentColor;
+  padding-bottom: 1px;
+}
+.status__link:hover { color: #fff; }
 
 /* ---------- フォールバック / キーボード用ナビ ---------- */
 
@@ -188,7 +298,7 @@
 
 /* WebGL が使えないときは球体を隠してカード表示に切り替える */
 .no-webgl .sphere-wrap,
-.no-webgl .hint { display: none; }
+.no-webgl .status { display: none; }
 
 .no-webgl .fallback-nav__title { font-size: 13px; letter-spacing: 0.08em; margin-bottom: 20px; }
 .no-webgl .fallback-nav__list { flex-direction: column; align-items: stretch; gap: 12px; }
@@ -242,32 +352,30 @@
   100% { transform: scale(34);  opacity: 0; }
 }
 
-/* イントロ中は本体を伏せておく */
+/* イントロ中は本体を伏せておく。
+   星と HIDD の opacity は JS が毎フレーム書くので、ここには含めない。 */
 .stage { opacity: 0; transition: opacity 0.8s var(--ease); }
 .is-revealed .stage { opacity: 1; }
 
-/* ラベルの opacity は js/sphere.js が毎フレーム inline で書く。
-   ここで transition を掛けると毎フレームの書き換えに追従できず、
-   文字が薄いまま止まって見えるので指定しない。入場フェードも JS 側で行う。 */
-
-.hint, .fallback-nav {
+.status, .fallback-nav {
   opacity: 0;
   transform: translateY(8px);
   transition: opacity 0.7s var(--ease), transform 0.7s var(--ease);
 }
-.is-revealed .hint,
+.is-revealed .status,
 .is-revealed .fallback-nav { opacity: 1; transform: none; }
-.is-revealed .hint.is-hidden { opacity: 0; }
 
 /* モーション抑制設定では演出を出さずに即表示する */
 @media (prefers-reduced-motion: reduce) {
   .intro-veil { display: none; }
-  .stage, .hint, .fallback-nav { opacity: 1; transform: none; }
+  .stage, .status, .fallback-nav { opacity: 1; transform: none; }
+  .star.is-twinkle::before, .star.is-twinkle::after { animation: none; }
+  .grow__card { transition: none; }
 }
 
 /* ---------- 画面が低いとき ---------- */
 
 @media (max-height: 640px) {
-  .sphere-wrap { width: min(62vmin, 460px); height: min(62vmin, 460px); }
+  .sphere-wrap { width: min(60vmin, 440px); height: min(60vmin, 440px); }
   .fallback-nav__title { display: none; }
 }

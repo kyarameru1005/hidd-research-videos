@@ -1,7 +1,7 @@
 /**
  * HIDD — 球体の回転まわりの計算
  *
- * 本番（js/sphere.js）と検討用デモ（demo/js/stars.js）の両方から使う。
+ * 本番（js/stars.js）と検討用デモ（demo/js/stars.js）の両方から使う。
  * DOM に触れない純粋な関数だけを置き、test/ から検証できるようにしている。
  *
  * 球体の回転は R = Rx(pitch) * Ry(yaw)（Three.js 既定の 'XYZ' 順）。
