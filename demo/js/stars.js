@@ -513,13 +513,25 @@
       var p = v.play();
       if (p && p.catch) {
         p.catch(function () {
-          var note = document.createElement('div');
-          note.className = 'no-file';
-          note.textContent = 'ブラウザが自動再生を止めました。再生ボタンを押してください。';
-          growPlayer.appendChild(note);
+          /* 音あり再生がブラウザに止められた場合、無音でなら自動再生できるので
+             まずそちらへ切り替える。無人展示で再生できないまま止まるのを避けるため。 */
+          if (!v.muted) {
+            v.muted = true;
+            var retry = v.play();
+            if (retry && retry.catch) retry.catch(showBlockedNote);
+          } else {
+            showBlockedNote();
+          }
         });
       }
       updateStatus();
+
+      function showBlockedNote() {
+        var note = document.createElement('div');
+        note.className = 'no-file';
+        note.textContent = 'ブラウザが自動再生を止めました。再生ボタンを押してください。';
+        growPlayer.appendChild(note);
+      }
     } else {
       var url = DATA.videoUrl(entry.video, 'preview');
       if (url) {
@@ -541,6 +553,32 @@
       }, 20000);
     }
   }
+
+  /* ---------------- 音声のロック解除 ----------------
+     ブラウザは音ありの自動再生を、その場での操作なしには許可しない。
+     ただし一度でもクリック・タップ・キー操作があれば、そのタブでは
+     以降ずっと解除されたままになる（ページを再読み込みするまで）。
+     展示を始めるときに画面へ 1 回触れてもらえば、それ以降は無人でも
+     音つきで流れ続ける。 */
+  function unlockSound() {
+    if (muted) {
+      muted = false;
+      var seg = document.getElementById('segSound');
+      if (seg) {
+        seg.querySelectorAll('button').forEach(function (b) {
+          b.setAttribute('aria-pressed', String(b.dataset.v === 'on'));
+        });
+      }
+    }
+    var v = growPlayer.querySelector('video');
+    if (v && v.muted) {
+      v.muted = false;
+      var p = v.play();
+      if (p && p.catch) p.catch(function () {});
+    }
+  }
+  document.addEventListener('pointerdown', unlockSound, { once: true });
+  document.addEventListener('keydown', unlockSound, { once: true });
 
   /**
    * 再生が進まなくなったら次へ送る。
