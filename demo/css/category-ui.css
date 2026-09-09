@@ -71,9 +71,41 @@
   color: var(--fg-mute); font-size: 14px;
 }
 
-/* 現状（参考）の枠 */
+/* 旧実装（参考）の枠
+   本番はフィルムストリップ（案 5）に移行したので、カード型の定義は
+   src/css/category.css から消えている。比較用にここへ写して保持する。 */
 .uid-current { background: #06070d; padding: 28px clamp(20px, 5vw, 40px) 40px; }
-.uid-current .video-grid { max-width: 1180px; margin: 0 auto; }
+
+.uid-current .video-grid {
+  max-width: 1180px; margin: 0 auto; padding: 0; list-style: none;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;
+}
+.uid-current .video-card {
+  display: flex; flex-direction: column; gap: 10px; height: 100%;
+  padding: 20px; text-align: left; font: inherit; color: inherit;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  cursor: pointer;
+  transition: transform .2s var(--ease), border-color .2s var(--ease),
+              background-color .2s var(--ease), box-shadow .2s var(--ease);
+}
+.uid-current .video-card:hover {
+  transform: translateY(-2px); background: var(--surface-hi);
+  border-color: var(--accent); box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+}
+.uid-current .video-card__presenter {
+  font-size: 11px; letter-spacing: 0.1em; color: var(--accent); font-weight: 700;
+}
+.uid-current .video-card__title { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.5; }
+.uid-current .video-card__summary { margin: 0; font-size: 13px; color: var(--fg-mute); flex: 1 1 auto; }
+.uid-current .video-card__cta {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 13px; font-weight: 700; color: var(--fg);
+}
+.uid-current .video-card__cta::before {
+  content: ""; width: 0; height: 0; border-style: solid;
+  border-width: 5px 0 5px 8px;
+  border-color: transparent transparent transparent var(--accent);
+}
 
 /* ============================================================
    案 1: エディトリアル（雑誌の目次）

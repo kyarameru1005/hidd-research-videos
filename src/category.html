@@ -23,7 +23,17 @@
 </header>
 
 <main class="cat-main">
-  <ul class="video-grid" id="videoGrid"></ul>
+  <div class="strip" id="strip">
+    <div class="strip__head">
+      <span class="strip__count" id="stripCount"></span>
+      <span class="strip__hint" id="stripHint">横にスクロールして選ぶ</span>
+      <div class="strip__nav" id="stripNav" hidden>
+        <button class="strip__navbtn" type="button" id="stripPrev" aria-label="前の動画へ">&larr;</button>
+        <button class="strip__navbtn" type="button" id="stripNext" aria-label="次の動画へ">&rarr;</button>
+      </div>
+    </div>
+    <div class="strip__track" id="videoTrack"></div>
+  </div>
   <p class="empty-note" id="emptyNote" hidden></p>
 </main>
 
