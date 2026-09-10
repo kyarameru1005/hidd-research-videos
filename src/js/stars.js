@@ -37,7 +37,6 @@
   var IDLE_MS = 5000;             /* 操作が止まってから球体が回り出すまで */
   var PLAY_MS = 5000;             /* 回り出してから動画を再生するまで */
   var STALL_MS = 12000;           /* これだけ再生が進まなければ次の動画へ */
-  var DRIVE_MS = 20000;           /* ドライブ埋め込みは終了を検知できないので時間で送る */
   var TOUR_RAD_PER_SEC = 0.35;
   var SNAP_MS = 620;
 
@@ -538,7 +537,7 @@
     if (entry.file) {
       playLocal(entry);
     } else {
-      playDrive(entry);
+      playMissing(entry);
     }
   }
 
@@ -602,30 +601,15 @@
     }
   }
 
-  /** ドライブ埋め込み。別オリジンなので再生開始も終了検知もできない */
-  function playDrive(entry) {
-    var url = DATA.videoUrl(entry.video, 'preview');
-    if (url) {
-      var f = document.createElement('iframe');
-      f.src = url;
-      f.setAttribute('allow', 'autoplay; fullscreen');
-      f.setAttribute('allowfullscreen', '');
-      f.setAttribute('referrerpolicy', 'no-referrer');
-      f.title = entry.video.title;
-      growPlayer.appendChild(f);
-    }
+  /** 動画ファイル未配置。再生のしようがないので stall 監視の時間切れで次へ送る */
+  function playMissing(entry) {
     var msg = document.createElement('div');
     msg.className = 'no-file';
-    msg.textContent = '動画ファイルが未配置のため、Google ドライブの埋め込みです。'
-      + '別オリジンのため自動再生と終了検知ができません。'
-      + (DRIVE_MS / 1000) + ' 秒で次へ送ります。';
+    msg.textContent = '動画ファイルが未配置です。'
+      + (STALL_MS / 1000) + ' 秒で次へ送ります。';
     growPlayer.appendChild(msg);
 
-    stopWatchdog();
-    watchdog = setTimeout(function () {
-      watchdog = null;
-      if (phase === 'playing') autoNext();
-    }, DRIVE_MS);
+    startWatchdog(function () { return 0; });
   }
 
   /**
