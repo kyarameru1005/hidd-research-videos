@@ -17,8 +17,9 @@
   <h1 class="sd-title">球体の慣性 デモ</h1>
   <p class="sd-lead">
     球体を勢いよく回してから指を離すと、そのまま余力で回り続けます。
+    <strong>既定は一番強い「重い（弾み車）」</strong>です。
     本番（<code>現在と同じ</code>）は 0.3 秒ほどで止まる短い減衰なので、
-    並べて比べられるように減衰の強さを 3 段階用意しました。
+    比較できるよう 3 段階を残してあります。
   </p>
   <p class="sd-note">
     検討用のページです。本番の <code>index.html</code> には手を入れていません。<br>
@@ -32,8 +33,8 @@
       <span class="sd-ctl__label">回転の重さ</span>
       <div class="sd-seg" id="segFriction">
         <button type="button" data-v="0.06" aria-pressed="false">現在と同じ</button>
-        <button type="button" data-v="0.68" aria-pressed="true">ふつう</button>
-        <button type="button" data-v="0.84" aria-pressed="false">重い（弾み車）</button>
+        <button type="button" data-v="0.68" aria-pressed="false">ふつう</button>
+        <button type="button" data-v="0.84" aria-pressed="true">重い（弾み車）</button>
       </div>
     </div>
     <div class="sd-ctl sd-ctl--push">

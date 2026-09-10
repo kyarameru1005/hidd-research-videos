@@ -19,8 +19,15 @@
   var TAU = Math.PI * 2;
   var HALF_PI = Math.PI / 2;
   var BRAND_R = 1.02;
-  var STAR_R = 1.04;
-  var MAJOR_R = 1.05;
+
+  /* 星は球面ちょうど（半径 1.0）に置く。
+     stars.js は 1.04 / 1.05 と少し浮かせているが、これは旧 sphere.js の名残。
+     当時マーカーは 3D の THREE.Points で、球に隠れないよう輪郭の外へ
+     押し出す必要があった（docs/decisions.md 参照）。
+     今の星はキャンバスの上に重ねた HTML 要素なので球に隠れることはなく、
+     浮かせると寄ったときに星だけが輪郭の外へ離れていく（100% で 27px ずれる）。 */
+  var STAR_R = 1.0;
+  var MAJOR_R = 1.0;
 
   var G = window.HIDDGeom;
   var clamp = G.clamp, smoothstep = G.smoothstep, easeInOutCubic = G.easeInOutCubic,

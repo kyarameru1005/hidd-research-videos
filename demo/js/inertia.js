@@ -170,8 +170,9 @@
   var snap = null;
   var running = false, lastFrame = 0, width = 1, height = 1;
 
-  /* 減衰の強さ（底が 1 に近いほどゆっくり止まる）。切り替えパネルが更新する */
-  var FRICTION = 0.68;
+  /* 減衰の強さ（底が 1 に近いほどゆっくり止まる）。切り替えパネルが更新する。
+     既定は「重い（弾み車）」＝ 0.84（半減期およそ 4 秒）。 */
+  var FRICTION = 0.84;
 
   function resize() {
     var r = host.getBoundingClientRect();
