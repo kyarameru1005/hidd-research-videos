@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HIDD — 先行研究 紹介動画</title>
-<meta name="description" content="先行研究の紹介動画をカテゴリ別に閲覧できるサイト。中央の球体を回してカテゴリを選択します。">
+<meta name="description" content="先行研究の紹介動画をカテゴリ別に閲覧できるサイト。球体を回して星を選ぶと動画が再生されます。">
 <link rel="stylesheet" href="css/common.css">
 <link rel="stylesheet" href="css/index.css">
 </head>
@@ -21,26 +21,36 @@
 
   <h1 class="visually-hidden">HIDD 先行研究 紹介動画</h1>
 
-  <!-- 球体（Three.js のキャンバスがここに入る） -->
   <div class="sphere-wrap" id="sphereWrap">
     <div class="sphere-canvas" id="sphereCanvas"
          role="application"
-         aria-label="カテゴリ選択の球体。ドラッグまたは矢印キーで回転します。"
+         aria-label="星の球体。ドラッグまたは矢印キーで回転、ホイール・ピンチ・プラスマイナスキーで拡大縮小します。明るい星がカテゴリ、周りの小さな星が動画です。"
          tabindex="0"></div>
 
-    <!-- 3D 座標に追従する HTML ラベル群 -->
-    <div class="labels" id="labels" aria-hidden="true">
-      <div class="label label--brand" data-anchor="brand">
-        <span class="label__brand-text">HIDD</span>
+    <!-- 星座線（球体の回転に追従して毎フレーム描き直す） -->
+    <svg class="constellations" id="constellations" aria-hidden="true"></svg>
+
+    <!-- 星とラベル（3D 座標に追従する HTML 要素） -->
+    <div class="overlay" id="overlay" aria-hidden="true">
+      <div class="brand" data-anchor="brand">高度ICTデザイン学科<br>研究成果動画</div>
+    </div>
+
+    <!-- 星から生えてくる再生カード -->
+    <div class="grow" id="grow" hidden>
+      <div class="grow__card" id="growCard">
+        <div class="grow__head">
+          <span class="grow__lab" id="growLab"></span>
+          <button class="grow__close" type="button" id="growClose" aria-label="閉じる">&times;</button>
+        </div>
+        <h2 class="grow__title" id="growTitle"></h2>
+        <div class="grow__player" id="growPlayer"></div>
+        <p class="grow__summary" id="growSummary"></p>
+        <div class="grow__bar"><span id="growProgress"></span></div>
       </div>
-      <!-- カテゴリラベルは js/sphere.js が data.js から生成 -->
     </div>
   </div>
 
-  <p class="hint" id="hint">
-    <span class="hint__icon" aria-hidden="true"></span>
-    球体をドラッグして回す（裏側にもカテゴリがあります）／ カテゴリをクリックで移動
-  </p>
+  <p class="status" id="status"></p>
 
   <!-- WebGL 非対応時のフォールバック兼、キーボード・支援技術向けの正規リンク -->
   <nav class="fallback-nav" id="fallbackNav" aria-label="カテゴリ">
@@ -54,7 +64,7 @@
 <script src="js/data.js"></script>
 <script src="js/geometry.js"></script>
 <script src="js/texture-lab.js"></script>
-<script src="js/sphere.js"></script>
+<script src="js/stars.js"></script>
 <script src="js/intro.js"></script>
 </body>
 </html>
