@@ -270,6 +270,7 @@
   var idleTimer = null, playTimer = null;
   var current = null;            /* 再生中のエントリ */
   var watchdog = null;           /* 再生が進まないときに次へ送る番人 */
+  var openTimer = null;          /* カードを開く合図（is-open を付ける）のタイマー */
   var bag = null;                /* 未再生の動画（シャッフル済み）。null は未初期化 */
 
   var intro = null;
@@ -531,8 +532,13 @@
 
     /* カードは星の位置（正面＝中央）から生える。
        hidden を外した直後に class を足すと transition が走らないので 1 拍置くが、
-       rAF はタブが非表示だと止まってカードが開かないままになる。必ず setTimeout で。 */
-    setTimeout(function () { grow.classList.add('is-open'); }, 20);
+       rAF はタブが非表示だと止まってカードが開かないままになる。必ず setTimeout で。
+       この待ちのあいだに閉じられることがあるので、closeCard が取り消せるよう控えておく。 */
+    if (openTimer) clearTimeout(openTimer);
+    openTimer = setTimeout(function () {
+      openTimer = null;
+      grow.classList.add('is-open');
+    }, 20);
 
     if (entry.file) {
       playLocal(entry);
@@ -636,6 +642,11 @@
 
   function closeCard() {
     stopWatchdog();
+    /* 開く合図がまだ発火していないなら取り消す。
+       これを消さないと、閉じた直後に遅れて is-open が付き、
+       下の後始末が「まだ開いている」と判断してカードが閉じないまま残る。
+       タブが非表示だと setTimeout が 1 秒以上遅らされるので、実際に起きる。 */
+    if (openTimer) { clearTimeout(openTimer); openTimer = null; }
     grow.classList.remove('is-open');
     sphereWrap.classList.remove('is-playing');
     var v = growPlayer.querySelector('video');
