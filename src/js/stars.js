@@ -1,14 +1,17 @@
 /**
- * HIDD — 星 + 放置時の自動再生 デモ（検討用）
+ * HIDD — トップページ（星の球体 ＋ 放置時の自動再生）
  *
- * ・動画 1 本 = 星 1 つ。同じカテゴリの星をカテゴリ方向のまわりに散らし、線で結んで星座にする
- * ・一定時間操作がないと球体が巡回を始め、さらに一定時間後にランダムな星を選ぶ
- * ・選んだ星を正面へ寄せてからカードを「生やし」、動画を再生する
- * ・再生が終わったら次の動画へ。どこかを触れば即座に止まる
+ * ・動画 1 本 = 星 1 つ。同じカテゴリの星を 1 等星のまわりに散らし、線で結んで星座にする
+ * ・1 等星＝カテゴリ。押すとそのカテゴリを選択し、周りの動画の星が浮かび上がる
+ * ・小さな星を押すと、その星からカードが生えて動画が再生される
+ * ・操作がないと IDLE_MS 後に球体が巡回を始め、さらに PLAY_MS 後に動画を自動再生する
+ * ・再生が終わったら次の動画へ。どこかを触れば即座に止まる（＝人が操作を取り戻す）
  *
- * 再生方式は 2 通りを自動で使い分ける。
- *   file  あり -> <video>。自動再生・再生終了の検知・再生位置の復元ができる
- *   file  なし -> Google ドライブの iframe。別オリジンなので JS から制御できず、自動再生できない
+ * 展示（無人ディスプレイ）を主眼に置いているので、以下を守っている。
+ *   - 進行に関わる処理は setTimeout で出す（rAF はタブ非表示だと止まるため）
+ *   - 再生が進まなくなったら次へ送る（1 本読めないだけで止まらないように）
+ *   - 音は最初から出す。ブラウザに止められたらミュートで再生を続け、
+ *     一度でも操作があればそこで音を戻す（docs/operations.md を参照）
  */
 (function () {
   'use strict';
@@ -16,16 +19,41 @@
   var DATA = window.HIDD_DATA;
   var TAU = Math.PI * 2;
   var HALF_PI = Math.PI / 2;
-  var LABEL_R = 1.16;
   var BRAND_R = 1.02;
-  var STAR_R = 1.04;
-  var MAJOR_R = 1.05;
-  var STORE = 'hidd.demo.pos.';
+
+  /* 星は球面ちょうど（半径 1.0）に置く。
+     以前は 1.04 / 1.05 と少し浮かせていたが、これは旧 sphere.js の名残だった。
+     当時マーカーは 3D の THREE.Points で、球に隠れないよう輪郭の外へ押し出す
+     必要があった（docs/decisions.md 参照）。今の星はキャンバスの上に重ねた
+     HTML 要素なので球に隠れることはなく、浮かせるとズームで寄ったときに
+     星だけが輪郭の外へ離れていってしまう。 */
+  var STAR_R = 1.0;
+  var MAJOR_R = 1.0;
+
+  var STORE = 'hidd.pos.';        /* 再生位置の保存キー */
+
+  /* ---------------- 展示の設定（固定値） ---------------- */
+
+  var IDLE_MS = 5000;             /* 操作が止まってから球体が回り出すまで */
+  var PLAY_MS = 5000;             /* 回り出してから動画を再生するまで */
+  var STALL_MS = 12000;           /* これだけ再生が進まなければ次の動画へ */
+  var DRIVE_MS = 20000;           /* ドライブ埋め込みは終了を検知できないので時間で送る */
+  var TOUR_RAD_PER_SEC = 0.35;
+  var SNAP_MS = 620;
+
+  /* 手を離したあとの減衰。1 に近いほど長く回り続ける。
+     0.84 は半減期およそ 4 秒（demo/inertia.html の「重い（弾み車）」）。 */
+  var FRICTION = 0.84;
+
+  /* ズーム（カメラを球の中心へ寄せる・引く）の範囲 */
+  var CAM_DEFAULT = 3.6;
+  var CAM_MIN = 1.75;
+  var CAM_MAX = 7.0;
 
   var reduceMotion = window.matchMedia &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-  /* 回転まわりの計算は ../src/js/geometry.js に集約している */
+  /* 回転まわりの計算は js/geometry.js に集約している */
   var G = window.HIDDGeom;
   var clamp = G.clamp, smoothstep = G.smoothstep, easeInOutCubic = G.easeInOutCubic,
       shortestAngle = G.shortestAngle, facingAngles = G.facingAngles, hasWebGL = G.hasWebGL;
@@ -69,52 +97,63 @@
       /* 中心から 26〜38 度。カテゴリ同士は 90 度離れているので、
          38 度までなら隣の星座と混ざらない（90 - 38*2 = 14 度の間隔が残る）。 */
       var theta = (26 + rnd() * 12) * Math.PI / 180;
-      var phi = (vi / n) * TAU + ci * 0.6;                 /* 4 本を 90 度ずつ均等に */
+      var phi = (vi / n) * TAU + ci * 0.6;
       ENTRIES.push({
         id: cat.id + '-' + (vi + 1),
         cat: cat,
         catIndex: ci,
         video: video,
-        /* デモ用の確認動画。本番では src/js/data.js の video.file を使う */
-        file: '../src/videos/sample/' + cat.id + '-0' + (vi + 1) + '.mp4',
+        file: DATA.videoFile(video),
         dir: scatter(d, theta, phi)
       });
     });
   });
 
-  /* ---------------- 起動 ---------------- */
+  /* ---------------- 要素 ---------------- */
 
-  var stage = document.getElementById('stage');
   var host = document.getElementById('sphereCanvas');
   var overlay = document.getElementById('overlay');
   var svg = document.getElementById('constellations');
   var statusEl = document.getElementById('status');
-  var navList = document.getElementById('navList');
+  var sphereWrap = document.getElementById('sphereWrap');
 
   var grow = document.getElementById('grow');
-  var growCard = document.getElementById('growCard');
   var growLab = document.getElementById('growLab');
   var growTitle = document.getElementById('growTitle');
   var growSummary = document.getElementById('growSummary');
   var growPlayer = document.getElementById('growPlayer');
   var growProgress = document.getElementById('growProgress');
 
-  DATA.categories.forEach(function (cat) {
-    var li = document.createElement('li');
-    var span = document.createElement('span');
-    span.className = 'chip';
-    span.style.setProperty('--cat', cat.accent);
-    span.innerHTML = '';
-    span.appendChild(document.createTextNode(cat.label + ' '));
-    var b = document.createElement('b');
-    b.textContent = '(' + cat.videos.length + ')';
-    span.appendChild(b);
-    li.appendChild(span);
-    navList.appendChild(li);
-  });
+  /** キーボードと支援技術、および WebGL 非対応時の正規の導線 */
+  function buildFallbackNav() {
+    var list = document.getElementById('fallbackList');
+    if (!list) return;
+
+    DATA.categories.forEach(function (cat) {
+      var li = document.createElement('li');
+      var a = document.createElement('a');
+      a.className = 'fallback-nav__link';
+      a.href = 'category.html?cat=' + encodeURIComponent(cat.id);
+      a.textContent = cat.label;
+      a.style.setProperty('--cat-accent', cat.accent);
+      li.appendChild(a);
+      list.appendChild(li);
+    });
+
+    var nav = document.getElementById('fallbackNav');
+    if (nav && !hasWebGL()) {
+      var note = document.createElement('p');
+      note.className = 'no-webgl-note';
+      note.textContent = 'このブラウザでは 3D 表示が使えないため、一覧から選択してください。';
+      nav.insertBefore(note, nav.firstChild);
+    }
+  }
+
+  buildFallbackNav();
 
   if (!hasWebGL()) {
-    document.getElementById('fallback').hidden = false;
+    document.body.classList.add('no-webgl');
+    window.HIDDSphere = { animateIn: function () {}, render: function () {} };
     return;
   }
 
@@ -122,7 +161,8 @@
 
   var scene = new THREE.Scene();
   var camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-  camera.position.set(0, 0, 3.6);
+  var camZ = CAM_DEFAULT;
+  camera.position.set(0, 0, camZ);
 
   var renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
@@ -159,7 +199,7 @@
     el.style.setProperty('--star', cat.accent);
     el.style.setProperty('--dur', '4.2s');
     el.setAttribute('role', 'button');
-    el.setAttribute('aria-label', cat.label + ' を選ぶ');
+    el.setAttribute('aria-label', cat.label + ' の動画一覧を開く');
 
     var spikes = document.createElement('span');
     spikes.className = 'star__spikes';
@@ -182,7 +222,7 @@
     el.addEventListener('click', function (e) {
       e.stopPropagation();
       noteActivity();
-      focusCategory(ci);
+      goToCategory(major);
     });
   });
 
@@ -193,10 +233,12 @@
     el.style.setProperty('--dur', (2.6 + rnd() * 2.6).toFixed(2) + 's');
     el.setAttribute('role', 'button');
     el.setAttribute('aria-label', entry.video.title);
+
     var tip = document.createElement('span');
     tip.className = 'star__tip star__tip--below';   /* 向きは updateOverlay が決め直す */
     tip.textContent = entry.video.title;
     el.appendChild(tip);
+
     overlay.appendChild(el);
     entry.el = el;
     addAnchor(el, entry.dir, STAR_R, 'star', entry);
@@ -224,17 +266,17 @@
   var yaw = 0, pitch = 0, velYaw = 0, velPitch = 0;
   var dragging = false, pointerId = null, lastX = 0, lastY = 0, lastT = 0;
   var snap = null, tour = null, tourStep = 0;
-  var running = false, lastFrame = 0, width = 1, height = 1, rect = { left: 0, top: 0 };
-  var showLines = true, twinkle = true, muted = true;
-  var idleMs = 5000, playMs = 4000;
+  var running = false, lastFrame = 0, width = 1, height = 1;
   var phase = 'idle';            /* idle | tour | playing */
   var idleTimer = null, playTimer = null;
   var current = null;            /* 再生中のエントリ */
   var watchdog = null;           /* 再生が進まないときに次へ送る番人 */
-  var STALL_MS = 12000;          /* これだけ進捗が無ければ次の動画へ */
-  var bag = null;   /* 未再生の動画（シャッフル済み）。null は未初期化 */
+  var bag = null;                /* 未再生の動画（シャッフル済み）。null は未初期化 */
 
-  var TOUR_RAD_PER_SEC = 0.35;
+  var intro = null;
+  var introScale = reduceMotion ? 1 : 0.001;
+  var introOpacity = reduceMotion ? 1 : 0;
+
   var TOUR_STOPS = (function () {
     var l = [[0, 0, 1]];
     for (var i = 0; i < DATA.categories.length; i++) l.push(DATA.direction(i));
@@ -245,7 +287,6 @@
 
   function resize() {
     var r = host.getBoundingClientRect();
-    rect = r;
     width = Math.max(1, Math.round(r.width));
     height = Math.max(1, Math.round(r.height));
     camera.aspect = width / height;
@@ -270,14 +311,14 @@
 
       if (a.kind === 'star' || a.kind === 'major') {
         /* 星は手前半球ではしっかり見え、輪郭を回り込んだところで消える */
-        a.vis = smoothstep(-0.28, 0.12, depth);
-        var sc = 0.7 + 0.6 * ((depth + 1) / 2);
+        a.vis = smoothstep(-0.28, 0.12, depth) * introOpacity;
+        var sc = (0.7 + 0.6 * ((depth + 1) / 2)) * introScale;
         a.el.style.transform = 'translate3d(' + a.x.toFixed(1) + 'px,' + a.y.toFixed(1) + 'px,0) scale(' + sc.toFixed(2) + ')';
         a.el.style.opacity = a.vis.toFixed(3);
         a.el.style.zIndex = String(Math.round((depth + 1) * 100));
         a.el.classList.toggle('is-back', a.vis < 0.25);
         /* カテゴリ名は 1 等星が正面を向いたときだけ出す */
-        if (a.nameEl) a.nameEl.style.opacity = smoothstep(0.45, 0.9, depth).toFixed(3);
+        if (a.nameEl) a.nameEl.style.opacity = (smoothstep(0.45, 0.9, depth) * introOpacity).toFixed(3);
         /* 吹き出しは星座の中心（1 等星）から見て外向きに出す。
            中央のカテゴリ名や隣の吹き出しと重ならないようにするため。 */
         if (a.kind === 'star' && a.entry && a.entry.majorAnchor) {
@@ -288,13 +329,13 @@
             : (mdy < 0 ? 'above' : 'below');
           if (a.tipSide !== side) {
             a.tipSide = side;
-            var tip = a.el.firstElementChild;
-            if (tip) tip.className = 'star__tip star__tip--' + side;
+            var t = a.el.firstElementChild;
+            if (t) t.className = 'star__tip star__tip--' + side;
           }
         }
       } else {
         /* HIDD は正面を向いたときだけ */
-        a.vis = smoothstep(0.55, 0.93, depth);
+        a.vis = smoothstep(0.55, 0.93, depth) * introOpacity;
         a.el.style.transform = 'translate3d(' + a.x.toFixed(1) + 'px,' + a.y.toFixed(1) + 'px,0) translate(-50%,-50%)';
         a.el.style.opacity = a.vis.toFixed(3);
       }
@@ -304,17 +345,18 @@
       var L = LINES[k];
       var pa = L.from, pb = L.to.anchor;
       if (!pa || !pb) continue;
-      var o = showLines ? Math.min(pa.vis, pb.vis) * 0.75 : 0;
       L.el.setAttribute('x1', pa.x.toFixed(1)); L.el.setAttribute('y1', pa.y.toFixed(1));
       L.el.setAttribute('x2', pb.x.toFixed(1)); L.el.setAttribute('y2', pb.y.toFixed(1));
-      L.el.setAttribute('opacity', o.toFixed(3));
+      L.el.setAttribute('opacity', (Math.min(pa.vis, pb.vis) * 0.75).toFixed(3));
     }
   }
 
   function drawFrame() {
     pitch = clamp(pitch, -HALF_PI, HALF_PI);
     group.rotation.set(pitch, yaw, 0);
+    group.scale.setScalar(introScale);
     group.updateMatrixWorld(true);
+    sphereMat.uniforms.uFade.value = introOpacity;
     renderer.render(scene, camera);
     updateOverlay();
   }
@@ -330,6 +372,15 @@
     var dt = Math.min((now - lastFrame) / 1000, 0.05);
     lastFrame = now;
     var busy = false;
+
+    /* 入場アニメーション（見た目だけ。進行は intro.js の setTimeout 側が持つ） */
+    if (intro) {
+      var it = clamp((now - intro.start) / intro.dur, 0, 1);
+      introScale = 0.001 + easeInOutCubic(it) * 0.999;
+      introOpacity = clamp((it - 0.25) / 0.55, 0, 1);
+      if (it >= 1) { intro = null; introScale = 1; introOpacity = 1; }
+      else busy = true;
+    }
 
     if (snap) {
       var st = clamp((now - snap.start) / snap.dur, 0, 1);
@@ -353,8 +404,9 @@
       }
       busy = true;
     } else if (Math.abs(velYaw) > 0.0004 || Math.abs(velPitch) > 0.0004) {
+      /* 手を離したあとの惰性。FRICTION が 1 に近いほど長く回り続ける */
       yaw += velYaw * dt; pitch += velPitch * dt;
-      velYaw *= Math.pow(0.06, dt); velPitch *= Math.pow(0.06, dt);
+      velYaw *= Math.pow(FRICTION, dt); velPitch *= Math.pow(FRICTION, dt);
       busy = true;
     } else { velYaw = 0; velPitch = 0; }
 
@@ -365,6 +417,9 @@
   /* ---------------- 巡回 ---------------- */
 
   function beginTourLeg() {
+    /* 巡回とスナップの最中は惰性を進めない。消しておかないと、
+       終わった瞬間に古い速度で回り出す（減衰が弱いほど派手に出る）。 */
+    velYaw = 0; velPitch = 0;
     var t = facingAngles(TOUR_STOPS[tourStep % TOUR_STOPS.length]);
     var dYaw = shortestAngle(yaw, t.yaw);
     var dPitch = t.pitch - pitch;
@@ -373,9 +428,8 @@
              dur: Math.max(200, (span / TOUR_RAD_PER_SEC) * 1000) };
   }
 
-  var SNAP_MS = 620;
-
   function snapTo(dir) {
+    velYaw = 0; velPitch = 0;
     var t = facingAngles(dir);
     snap = {
       fromYaw: yaw, fromPitch: pitch,
@@ -386,40 +440,39 @@
     requestRender();
   }
 
-  /* ---------------- カテゴリの選択（1 等星） ---------------- */
+  /* ---------------- ズーム ----------------
+     カメラを球の中心へ寄せる・引くだけ（dolly）。
+     星の見え隠れは depth = world.z / radius（ワールド座標の前後方向）で決めていて
+     カメラ距離に依存しないので、見え方の計算式には手を入れていない。 */
 
-  var focused = -1;
+  var pinchPointers = new Map();
+  var pinchDist = null;
 
-  function focusCategory(ci) {
-    focused = (focused === ci) ? -1 : ci;
-    applyFocus();
-    if (focused >= 0) snapTo(DATA.direction(focused));
+  function pinchDistance() {
+    var pts = Array.from(pinchPointers.values());
+    return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+  }
+
+  function setZoom(z) {
+    var next = clamp(z, CAM_MIN, CAM_MAX);
+    if (next === camZ) return;
+    camZ = next;
+    camera.position.z = camZ;
     requestRender();
   }
 
-  function applyFocus() {
-    MAJORS.forEach(function (m) {
-      m.el.classList.toggle('is-focused', m.ci === focused);
-      m.el.classList.toggle('is-dim', focused >= 0 && m.ci !== focused);
-    });
-    ENTRIES.forEach(function (x) {
-      x.el.classList.toggle('is-focused', x.catIndex === focused);
-      x.el.classList.toggle('is-dim', focused >= 0 && x.catIndex !== focused);
-    });
-    document.getElementById('sphereWrap').classList.toggle('has-focus', focused >= 0);
-    if (focused >= 0) {
-      var cat = DATA.categories[focused];
-      statusEl.classList.add('is-live');
-      statusEl.innerHTML = '<b>' + cat.label + '</b> を選択中 — 周りの星が ' +
-        cat.videos.length + ' 本の動画です（もう一度押すと解除）' +
-        ' <a class="sd-link" href="../src/category.html?cat=' + encodeURIComponent(cat.id) + '">一覧ページを開く →</a>';
-    }
-  }
+  /* ---------------- カテゴリの選択（1 等星） ----------------
+     押すと、その星を正面へ寄せてからカテゴリの一覧ページへ移動する。
+     rAF はタブが非表示だと止まるので、遷移はスナップの完了ではなく
+     setTimeout で出す（CLAUDE.md の制約と同じ理由）。 */
 
-  function clearFocus() {
-    if (focused < 0) return;
-    focused = -1;
-    applyFocus();
+  function goToCategory(major) {
+    major.el.classList.add('is-picked');
+    snapTo(DATA.direction(major.ci));
+    setPhase('idle');
+    setTimeout(function () {
+      window.location.href = 'category.html?cat=' + encodeURIComponent(major.cat.id);
+    }, SNAP_MS + 30);
   }
 
   /* ---------------- 再生 ---------------- */
@@ -446,12 +499,13 @@
   }
 
   function savedPos(entry) {
-    var v = parseFloat(localStorage.getItem(STORE + entry.id) || '0');
-    return isFinite(v) ? v : 0;
+    try {
+      var v = parseFloat(localStorage.getItem(STORE + entry.id) || '0');
+      return isFinite(v) ? v : 0;
+    } catch (e) { return 0; }
   }
 
   function pickAndPlay(entry) {
-    clearFocus();
     markPlayed(entry);
     current = entry;
     ENTRIES.forEach(function (x) { x.el.classList.toggle('is-picked', x === entry); });
@@ -469,116 +523,110 @@
     grow.style.setProperty('--cat', entry.cat.accent);
     growLab.textContent = entry.cat.label;
     growTitle.textContent = entry.video.title;
-    growSummary.textContent = (entry.video.presenter ? entry.video.presenter + ' — ' : '') + (entry.video.summary || '');
+    growSummary.textContent =
+      (entry.video.presenter ? entry.video.presenter + ' — ' : '') + (entry.video.summary || '');
     growProgress.style.width = '0%';
     growPlayer.innerHTML = '';
     grow.hidden = false;
-    document.getElementById('sphereWrap').classList.add('is-playing');
+    sphereWrap.classList.add('is-playing');
 
-    /* カードは星の位置（正面＝中央）から生える */
-    requestAnimationFrame(function () { grow.classList.add('is-open'); });
+    /* カードは星の位置（正面＝中央）から生える。
+       hidden を外した直後に class を足すと transition が走らないので 1 拍置くが、
+       rAF はタブが非表示だと止まってカードが開かないままになる。必ず setTimeout で。 */
+    setTimeout(function () { grow.classList.add('is-open'); }, 20);
 
     if (entry.file) {
-      var v = document.createElement('video');
-      v.src = entry.file;
-      v.playsInline = true;
-      v.muted = muted;
-      v.preload = 'metadata';
-      v.controls = true;
-      growPlayer.appendChild(v);
+      playLocal(entry);
+    } else {
+      playDrive(entry);
+    }
+  }
 
-      var resumeAt = savedPos(entry);
-      v.addEventListener('loadedmetadata', function () {
-        if (resumeAt > 1 && resumeAt < v.duration - 2) v.currentTime = resumeAt;
-      });
-      var lastSave = 0;
-      v.addEventListener('timeupdate', function () {
-        if (v.duration) growProgress.style.width = (v.currentTime / v.duration * 100).toFixed(1) + '%';
-        var now = performance.now();
-        if (now - lastSave > 1000) {
-          lastSave = now;
-          try { localStorage.setItem(STORE + entry.id, String(v.currentTime)); } catch (e) {}
+  /** ローカル動画。自動再生・終了検知・再生位置の復元ができる */
+  function playLocal(entry) {
+    var v = document.createElement('video');
+    v.src = entry.file;
+    v.playsInline = true;
+    v.preload = 'metadata';
+    v.controls = true;
+    v.muted = false;              /* まず音ありで試す */
+    growPlayer.appendChild(v);
+
+    var resumeAt = savedPos(entry);
+    v.addEventListener('loadedmetadata', function () {
+      if (resumeAt > 1 && resumeAt < v.duration - 2) v.currentTime = resumeAt;
+    });
+
+    var lastSave = 0;
+    v.addEventListener('timeupdate', function () {
+      if (v.duration) growProgress.style.width = (v.currentTime / v.duration * 100).toFixed(1) + '%';
+      var now = performance.now();
+      if (now - lastSave > 1000) {
+        lastSave = now;
+        try { localStorage.setItem(STORE + entry.id, String(v.currentTime)); } catch (e) {}
+      }
+    });
+
+    v.addEventListener('ended', function () {
+      try { localStorage.removeItem(STORE + entry.id); } catch (e) {}
+      if (phase === 'playing') setTimeout(function () { if (phase === 'playing') autoNext(); }, 900);
+    });
+
+    v.addEventListener('error', function () {
+      if (phase === 'playing') { stopWatchdog(); autoNext(); }
+    });
+
+    startWatchdog(function () { return v.currentTime; });
+
+    var p = v.play();
+    if (p && p.catch) {
+      p.catch(function () {
+        /* 音ありを止められた。無音でなら自動再生できるので、まずそちらへ倒す。
+           無人展示で「再生できないまま次々スキップされる」のを避けるため。
+           音は最初の操作で戻す（unlockSound）。 */
+        if (!v.muted) {
+          v.muted = true;
+          var retry = v.play();
+          if (retry && retry.catch) retry.catch(showBlocked);
+        } else {
+          showBlocked();
         }
       });
-      v.addEventListener('ended', function () {
-        try { localStorage.removeItem(STORE + entry.id); } catch (e) {}
-        if (phase === 'playing') setTimeout(function () { if (phase === 'playing') autoNext(); }, 900);
-      });
+    }
 
-      v.addEventListener('error', function () {
-        if (phase === 'playing') { stopWatchdog(); autoNext(); }
-      });
-      startWatchdog(function () { return v.currentTime; });
-
-      var p = v.play();
-      if (p && p.catch) {
-        p.catch(function () {
-          /* 音あり再生がブラウザに止められた場合、無音でなら自動再生できるので
-             まずそちらへ切り替える。無人展示で再生できないまま止まるのを避けるため。 */
-          if (!v.muted) {
-            v.muted = true;
-            var retry = v.play();
-            if (retry && retry.catch) retry.catch(showBlockedNote);
-          } else {
-            showBlockedNote();
-          }
-        });
-      }
-      updateStatus();
-
-      function showBlockedNote() {
-        var note = document.createElement('div');
-        note.className = 'no-file';
-        note.textContent = 'ブラウザが自動再生を止めました。再生ボタンを押してください。';
-        growPlayer.appendChild(note);
-      }
-    } else {
-      var url = DATA.videoUrl(entry.video, 'preview');
-      if (url) {
-        var f = document.createElement('iframe');
-        f.src = url;
-        f.setAttribute('allow', 'autoplay; fullscreen');
-        f.setAttribute('allowfullscreen', '');
-        growPlayer.appendChild(f);
-      }
-      var msg = document.createElement('div');
-      msg.className = 'no-file';
-      msg.textContent = '動画ファイルが未配置のため Google ドライブ埋め込みです。別オリジンのため自動再生・終了検知ができません。20 秒で次へ送ります。';
-      growPlayer.appendChild(msg);
-      /* 終了を検知できないので時間で送るしかない */
-      stopWatchdog();
-      watchdog = setTimeout(function () {
-        watchdog = null;
-        if (phase === 'playing') autoNext();
-      }, 20000);
+    function showBlocked() {
+      var note = document.createElement('div');
+      note.className = 'no-file';
+      note.textContent = 'ブラウザが自動再生を止めました。再生ボタンを押してください。';
+      growPlayer.appendChild(note);
     }
   }
 
-  /* ---------------- 音声のロック解除 ----------------
-     ブラウザは音ありの自動再生を、その場での操作なしには許可しない。
-     ただし一度でもクリック・タップ・キー操作があれば、そのタブでは
-     以降ずっと解除されたままになる（ページを再読み込みするまで）。
-     展示を始めるときに画面へ 1 回触れてもらえば、それ以降は無人でも
-     音つきで流れ続ける。 */
-  function unlockSound() {
-    if (muted) {
-      muted = false;
-      var seg = document.getElementById('segSound');
-      if (seg) {
-        seg.querySelectorAll('button').forEach(function (b) {
-          b.setAttribute('aria-pressed', String(b.dataset.v === 'on'));
-        });
-      }
+  /** ドライブ埋め込み。別オリジンなので再生開始も終了検知もできない */
+  function playDrive(entry) {
+    var url = DATA.videoUrl(entry.video, 'preview');
+    if (url) {
+      var f = document.createElement('iframe');
+      f.src = url;
+      f.setAttribute('allow', 'autoplay; fullscreen');
+      f.setAttribute('allowfullscreen', '');
+      f.setAttribute('referrerpolicy', 'no-referrer');
+      f.title = entry.video.title;
+      growPlayer.appendChild(f);
     }
-    var v = growPlayer.querySelector('video');
-    if (v && v.muted) {
-      v.muted = false;
-      var p = v.play();
-      if (p && p.catch) p.catch(function () {});
-    }
+    var msg = document.createElement('div');
+    msg.className = 'no-file';
+    msg.textContent = '動画ファイルが未配置のため、Google ドライブの埋め込みです。'
+      + '別オリジンのため自動再生と終了検知ができません。'
+      + (DRIVE_MS / 1000) + ' 秒で次へ送ります。';
+    growPlayer.appendChild(msg);
+
+    stopWatchdog();
+    watchdog = setTimeout(function () {
+      watchdog = null;
+      if (phase === 'playing') autoNext();
+    }, DRIVE_MS);
   }
-  document.addEventListener('pointerdown', unlockSound, { once: true });
-  document.addEventListener('keydown', unlockSound, { once: true });
 
   /**
    * 再生が進まなくなったら次へ送る。
@@ -593,7 +641,6 @@
       if (t !== lastT) { lastT = t; lastMove = performance.now(); }
       if (performance.now() - lastMove > STALL_MS) {
         stopWatchdog();
-        statusEl.innerHTML = '再生が進まないため次の動画へ送りました';
         autoNext();
       }
     }, 1000);
@@ -606,7 +653,7 @@
   function closeCard() {
     stopWatchdog();
     grow.classList.remove('is-open');
-    document.getElementById('sphereWrap').classList.remove('is-playing');
+    sphereWrap.classList.remove('is-playing');
     var v = growPlayer.querySelector('video');
     if (v) { try { v.pause(); } catch (e) {} }
     setTimeout(function () {
@@ -621,6 +668,25 @@
     setTimeout(function () { if (phase === 'playing') pickAndPlay(nextEntry()); }, 380);
   }
 
+  /* ---------------- 音声のロック解除 ----------------
+     ブラウザは音ありの自動再生を、その場での操作なしには許可しない。
+     ただし一度でもクリック・タップ・キー操作があれば、そのタブでは
+     以降ずっと解除されたままになる（ページを再読み込みするまで）。
+     展示を始めるときに画面へ 1 回触れてもらえば、そのあとは無人でも音つきで流れる。
+
+     誰も触らずに音を出したい場合は、ブラウザ側の自動再生ポリシーを切って
+     起動する必要がある。手順は docs/operations.md に書いてある。 */
+  function unlockSound() {
+    var v = growPlayer.querySelector('video');
+    if (v && v.muted) {
+      v.muted = false;
+      var p = v.play();
+      if (p && p.catch) p.catch(function () {});
+    }
+  }
+  document.addEventListener('pointerdown', unlockSound, { once: true });
+  document.addEventListener('keydown', unlockSound, { once: true });
+
   /* ---------------- 放置の状態遷移 ---------------- */
 
   function setPhase(p) {
@@ -629,16 +695,16 @@
   }
 
   function updateStatus() {
-    if (phase === 'idle') {
-      statusEl.classList.remove('is-live');
-      statusEl.innerHTML = '操作がないと <b>' + (idleMs / 1000) + '</b> 秒後に回り始めます';
+    if (!statusEl) return;
+    if (phase === 'playing') {
+      statusEl.classList.add('is-live');
+      statusEl.innerHTML = '再生中: <b>' + (current ? current.video.title : '') + '</b>';
     } else if (phase === 'tour') {
       statusEl.classList.add('is-live');
-      statusEl.innerHTML = '回転中 — <b>' + (playMs / 1000) + '</b> 秒後にランダムな動画を選びます';
+      statusEl.textContent = '動画を選んでいます…';
     } else {
-      statusEl.classList.add('is-live');
-      var left = bag ? bag.length : ENTRIES.length;
-      statusEl.innerHTML = '再生中: <b>' + (current ? current.video.title : '') + '</b>（未再生の残り ' + left + ' 本）';
+      statusEl.classList.remove('is-live');
+      statusEl.textContent = 'ドラッグで回す ／ ホイールかピンチで拡大 ／ 明るい星がカテゴリ、小さな星が動画';
     }
   }
 
@@ -647,7 +713,12 @@
     if (playTimer) { clearTimeout(playTimer); playTimer = null; }
   }
 
-  /** 操作があった。全部止めて測り直す */
+  /**
+   * 操作があった。全部止めて測り直す。
+   *
+   * 進行は rAF ではなく setTimeout に持たせている。タブが非表示のあいだは
+   * 描画も再生も止まるので、そこで動き出さないよう document.hidden も見る。
+   */
   function noteActivity() {
     clearTimers();
     tour = null;
@@ -657,6 +728,9 @@
     idleTimer = setTimeout(function () {
       idleTimer = null;
       if (document.hidden) return;
+      /* 無人展示では、来場者が寄せたままの倍率で放置されると
+         そのあとずっと寄ったままになる。巡回に戻るときに既定へ戻す。 */
+      setZoom(CAM_DEFAULT);
       setPhase('tour');
       tourStep = 0;
       beginTourLeg();
@@ -665,8 +739,8 @@
         playTimer = null;
         if (document.hidden) return;
         pickAndPlay(nextEntry());
-      }, playMs);
-    }, idleMs);
+      }, PLAY_MS);
+    }, IDLE_MS);
   }
 
   /* ---------------- 操作 ---------------- */
@@ -674,17 +748,34 @@
   var DRAG_K = 0.006;
 
   host.addEventListener('pointerdown', function (e) {
+    pinchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    /* 指が 2 本になったらピンチ。回転は止めてズームに切り替える */
+    if (pinchPointers.size >= 2) {
+      dragging = false;
+      pinchDist = pinchDistance();
+      noteActivity();
+      return;
+    }
     if (e.button !== undefined && e.button !== 0) return;
     dragging = true; pointerId = e.pointerId;
     lastX = e.clientX; lastY = e.clientY; lastT = performance.now();
     velYaw = 0; velPitch = 0; snap = null;
-    clearFocus();
     noteActivity();
     host.classList.add('is-dragging');
     if (host.setPointerCapture) { try { host.setPointerCapture(e.pointerId); } catch (err) {} }
     requestRender();
   });
+
   host.addEventListener('pointermove', function (e) {
+    if (pinchPointers.has(e.pointerId)) pinchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pinchPointers.size >= 2) {
+      var d = pinchDistance();
+      if (pinchDist !== null) setZoom(camZ - (d - pinchDist) * 0.012 * camZ);
+      pinchDist = d;
+      return;
+    }
     if (!dragging || e.pointerId !== pointerId) return;
     var now = performance.now();
     var dx = e.clientX - lastX, dy = e.clientY - lastY;
@@ -695,7 +786,11 @@
     lastX = e.clientX; lastY = e.clientY; lastT = now;
     requestRender();
   });
+
   function endDrag(e) {
+    pinchPointers.delete(e.pointerId);
+    if (pinchPointers.size < 2) pinchDist = null;
+
     if (!dragging || (pointerId !== null && e.pointerId !== pointerId)) return;
     dragging = false; pointerId = null;
     host.classList.remove('is-dragging');
@@ -708,53 +803,28 @@
   host.addEventListener('pointercancel', endDrag);
   host.addEventListener('lostpointercapture', endDrag);
 
+  /* ホイールでズーム。Ctrl 併用はブラウザのページ拡大操作なので横取りしない */
+  host.addEventListener('wheel', function (e) {
+    if (e.ctrlKey) return;
+    e.preventDefault();
+    setZoom(camZ + e.deltaY * 0.0022 * camZ);
+    noteActivity();
+  }, { passive: false });
+
   host.addEventListener('keydown', function (e) {
     var step = 0.22, ok = true;
     if (e.key === 'ArrowLeft') yaw -= step;
     else if (e.key === 'ArrowRight') yaw += step;
     else if (e.key === 'ArrowUp') pitch = clamp(pitch - step, -HALF_PI, HALF_PI);
     else if (e.key === 'ArrowDown') pitch = clamp(pitch + step, -HALF_PI, HALF_PI);
+    else if (e.key === '+' || e.key === '=') { setZoom(camZ * 0.9); noteActivity(); ok = false; }
+    else if (e.key === '-' || e.key === '_') { setZoom(camZ / 0.9); noteActivity(); ok = false; }
     else ok = false;
     if (ok) { e.preventDefault(); noteActivity(); snap = null; requestRender(); }
   });
 
   document.getElementById('growClose').addEventListener('click', function () { noteActivity(); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') noteActivity(); });
-
-  /* ---------------- 操作パネル ---------------- */
-
-  function seg(id, fn) {
-    var el = document.getElementById(id);
-    el.addEventListener('click', function (e) {
-      var b = e.target.closest('button');
-      if (!b) return;
-      el.querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); });
-      fn(b.dataset.v);
-    });
-  }
-  seg('segIdle', function (v) { idleMs = parseInt(v, 10); noteActivity(); });
-  seg('segPlay', function (v) { playMs = parseInt(v, 10); noteActivity(); });
-  seg('segLines', function (v) { showLines = (v === 'on'); requestRender(); });
-  seg('segTwinkle', function (v) {
-    twinkle = (v === 'on');
-    ENTRIES.forEach(function (x) { x.el.classList.toggle('is-twinkle', twinkle); });
-  });
-  seg('segSound', function (v) {
-    muted = (v === 'off');
-    var el = growPlayer.querySelector('video');
-    if (el) el.muted = muted;
-  });
-
-  document.getElementById('btnPlayNow').addEventListener('click', function () {
-    clearTimers();
-    setPhase('playing');
-    pickAndPlay(nextEntry());
-  });
-  document.getElementById('btnReset').addEventListener('click', function () {
-    ENTRIES.forEach(function (x) { try { localStorage.removeItem(STORE + x.id); } catch (e) {} });
-    bag = null;
-    noteActivity();
-  });
 
   /* ---------------- その他 ---------------- */
 
@@ -763,6 +833,7 @@
     if (rt) clearTimeout(rt);
     rt = setTimeout(function () { resize(); drawFrame(); }, 150);
   });
+
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) { clearTimers(); tour = null; }
     else { noteActivity(); requestRender(); }
@@ -770,5 +841,19 @@
 
   resize();
   drawFrame();
-  noteActivity();
+  updateStatus();
+
+  /* 入場アニメーションの合図は intro.js が出す（rAF に紐づけない） */
+  window.HIDDSphere = {
+    animateIn: function (duration) {
+      if (reduceMotion) {
+        introScale = 1; introOpacity = 1;
+      } else {
+        intro = { start: performance.now(), dur: duration || 1100 };
+      }
+      noteActivity();      /* ここから無操作時間の計測を始める */
+      requestRender();
+    },
+    render: requestRender
+  };
 })();

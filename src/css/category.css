@@ -66,89 +66,194 @@
   font-size: 14px;
 }
 
-/* ---------- 動画カード ---------- */
+/* ---------- 動画（フィルムストリップ） ---------- */
 
 .cat-main {
   position: relative;
   z-index: 1;
   max-width: 1080px;
   margin: 0 auto;
-  padding: clamp(28px, 5vh, 48px) clamp(20px, 6vw, 56px) 0;
+  padding: clamp(28px, 5vh, 48px) 0 0;
+  /* トラックの左右余白。スナップ位置とナビの位置も同じ値に揃える */
+  --strip-pad: clamp(20px, 6vw, 56px);
 }
 
-.video-grid {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+.strip[hidden] { display: none; }
+
+.strip__head {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 0 0 14px;
+  padding: 0 var(--strip-pad);
+}
+
+.strip__count {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--fg-dim);
+}
+
+.strip__hint {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--fg-dim);
+}
+.strip__hint[hidden] { display: none; }
+
+.strip__track {
+  display: flex;
   gap: 16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scroll-snap-type: x mandatory;
+  /* これがないと先頭パネルが左余白の下に隠れてスナップする */
+  scroll-padding-left: var(--strip-pad);
+  padding: 4px var(--strip-pad) 18px;
+  scrollbar-width: thin;
 }
 
-.video-card {
+/* ---------- フィルムのコマ（1 本 = 1 パネル） ---------- */
+
+.film {
+  position: relative;
+  flex: 0 0 clamp(240px, 30vw, 320px);
+  aspect-ratio: 3 / 4;
+  scroll-snap-align: start;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  height: 100%;
-  padding: 20px;
+  justify-content: space-between;
+  padding: 20px 18px;
   text-align: left;
   font: inherit;
   color: inherit;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  border: 0;
+  border-radius: 2px;
+  overflow: hidden;
   cursor: pointer;
-  transition: transform 0.2s var(--ease), border-color 0.2s var(--ease),
-              background-color 0.2s var(--ease), box-shadow 0.2s var(--ease);
-}
-.video-card:hover {
-  transform: translateY(-2px);
-  background: var(--surface-hi);
-  border-color: var(--accent);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  background: linear-gradient(165deg,
+    color-mix(in srgb, var(--accent) 40%, #0d1220) 0%,
+    #0a0d18 58%, #06080f 100%);
+  transition: transform 0.25s var(--ease);
 }
 
-.video-card__presenter {
-  font-size: 11px;
-  letter-spacing: 0.1em;
-  color: var(--accent);
-  font-weight: 700;
+/* color-mix / aspect-ratio 未対応ブラウザ向けのフォールバック */
+@supports not (color: color-mix(in srgb, red, blue)) {
+  .film { background: linear-gradient(165deg, #1b2740 0%, #0a0d18 58%, #06080f 100%); }
+}
+@supports not (aspect-ratio: 3 / 4) {
+  .film { height: 420px; }
 }
 
-.video-card__title {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.5;
-}
-
-.video-card__summary {
-  margin: 0;
-  font-size: 13px;
-  color: var(--fg-mute);
-  flex: 1 1 auto;
-}
-
-.video-card__cta {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--fg);
-}
-.video-card__cta::before {
+.film::after {
   content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+.film:hover { transform: translateY(-6px); }
+.film:disabled { cursor: default; opacity: 0.55; }
+.film:disabled:hover { transform: none; }
+
+.film__no {
+  font-size: 52px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: rgba(255, 255, 255, 0.16);
+}
+
+.film__body { position: relative; }
+
+.film__lab {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--accent);
+}
+
+.film__title {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.film__summary {
+  display: block;
+  margin-bottom: 14px;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--fg-mute);
+}
+
+.film__play {
+  position: relative;
+  display: inline-block;
+  padding-left: 36px;
+  line-height: 26px;
+  font-size: 12px;
+  font-weight: 700;
+}
+.film__play::before {   /* 丸い枠 */
+  content: "";
+  position: absolute;
+  left: 0; top: 50%;
+  transform: translateY(-50%);
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--accent);
+}
+.film__play::after {    /* 再生の三角 */
+  content: "";
+  position: absolute;
+  left: 10px; top: 50%;
+  transform: translateY(-50%);
   width: 0; height: 0;
   border-style: solid;
   border-width: 5px 0 5px 8px;
   border-color: transparent transparent transparent var(--accent);
 }
 
-.video-card__missing {
+.film__missing {
   font-size: 12px;
   color: var(--fg-dim);
 }
+
+/* ---------- 送りボタン（マウスでも送れるように） ----------
+   パネルに重ねず見出し行に置く。指で送れる幅でも同じ位置に出る。 */
+
+.strip__nav {
+  display: flex;
+  gap: 8px;
+  align-self: center;
+}
+.strip__nav[hidden] { display: none; }
+
+.strip__navbtn {
+  width: 34px; height: 34px;
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--fg);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease),
+              background-color 0.2s var(--ease), opacity 0.2s var(--ease);
+}
+.strip__navbtn:hover { border-color: var(--accent); background: var(--surface); }
+.strip__navbtn:disabled { opacity: 0.25; cursor: default; }
+.strip__navbtn:disabled:hover { border-color: var(--border); background: transparent; }
 
 .empty-note {
   margin: 40px 0;

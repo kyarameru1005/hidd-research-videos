@@ -91,26 +91,49 @@ test('Three.js は UMD 版が同梱されている（THREE をグローバルに
 
 /* --- 過去に踏んだ不具合の再発防止 --- */
 
-test('JS が毎フレーム書く opacity に CSS transition を掛けていない', () => {
+test('JS が毎フレーム書く opacity / transform に CSS transition を掛けていない', () => {
   // 以前 .label--brand に transition が残り、HIDD の文字が薄いまま止まった
+  // js/stars.js が inline で毎フレーム書く要素だけを見る（擬似要素や子要素は対象外）
   const css = read('src/css/index.css');
-  const rule = css.match(/\.label--brand\s*\{[^}]*\}/);
-  assert.ok(rule, '.label--brand の定義が見つからない');
-  assert.ok(!/transition/.test(rule[0]),
-    '.label--brand に transition がある。opacity は JS が毎フレーム書くので追従できない');
+  const guarded = ['.brand', '.star', '.star__name', '.constellations line'];
+
+  for (const sel of guarded) {
+    const lit = sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/ /g, '\\s+');
+    const rule = css.match(new RegExp('(?:^|\\})\\s*' + lit + '\\s*\\{([^}]*)\\}', 'm'));
+    assert.ok(rule, `${sel} の定義が見つからない`);
+    // コメントでの言及は許し、実際の宣言だけを見る
+    assert.ok(!/transition[a-z-]*\s*:/.test(rule[1]),
+      `${sel} に transition がある。opacity / transform は JS が毎フレーム書くので追従できない`);
+  }
 });
 
 test('重要な処理を requestAnimationFrame の完了に紐づけていない', () => {
   // 以前 遷移やカード表示を rAF 完了に紐づけ、背景タブで固まった
-  for (const f of ['src/js/sphere.js', 'demo/js/stars.js']) {
+  for (const f of ['src/js/stars.js', 'demo/js/stars.js']) {
     // コメントでの言及は許し、実際の受け渡し・呼び出しだけを見る
     assert.ok(!/onDone\s*[(:=]/.test(read(f)),
       `${f} に onDone コールバックが復活している（進行はアニメ完了でなく setTimeout で出すこと）`);
   }
 });
 
+test('カードの表示を requestAnimationFrame に紐づけていない', () => {
+  // rAF はタブ非表示だと止まる。カードを開く class を rAF の中で足すと、
+  // 再生は始まっているのにカードが opacity 0 のまま見えない状態になる。
+  assert.ok(!/requestAnimationFrame\s*\([\s\S]{0,120}?is-open/.test(read('src/js/stars.js')),
+    'src/js/stars.js がカードの表示を rAF に紐づけている（setTimeout で出すこと）');
+});
+
+test('横送りの状態更新を scroll イベントだけに任せていない', () => {
+  // scroll も描画フレーム待ちなので、背景タブでは飛んでこない。
+  // 送りボタンが無効のまま固まるのを防ぐため setTimeout でも直すこと。
+  const code = read('src/js/category.js');
+  assert.ok(/setTimeout\(\s*updateNav/.test(code),
+    'src/js/category.js が updateNav を setTimeout で呼んでいない。' +
+    'scroll イベントはタブ非表示だと来ないので、ボタンが押せなくなる');
+});
+
 test('回転の計算が 1 か所にまとまっている（重複させない）', () => {
-  for (const f of ['src/js/sphere.js', 'demo/js/stars.js']) {
+  for (const f of ['src/js/stars.js', 'demo/js/stars.js']) {
     assert.ok(!/^\s*function facingAngles/m.test(read(f)),
       `${f} が facingAngles を再定義している。src/js/geometry.js を使うこと`);
   }
