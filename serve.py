@@ -13,14 +13,62 @@ HIDD — 動作確認・展示用の簡易サーバー
 
     /src/            本番サイト
     /demo/           検討用デモの一覧
+
+あわせて、src/videos/<カテゴリid>/ に置かれた動画を走査して
+/src/js/videos.js を生成します（リクエストのたびに作り直す）。
+動画をフォルダに入れてブラウザを再読み込みすれば、そのまま球体に反映されます。
+サーバーの再起動は要りません。
 """
 import http.server
+import io
+import json
 import os
 import re
 import socketserver
 import sys
 
 RANGE_RE = re.compile(r"bytes=(\d*)-(\d*)")
+
+ROOT = os.path.dirname(os.path.abspath(__file__))
+
+# 自動生成する一覧の場所と、走査対象にする拡張子
+VIDEOS_JS = "/src/js/videos.js"
+VIDEO_EXT = (".mp4", ".webm", ".ogv", ".ogg", ".m4v", ".mov")
+
+
+def scan_videos():
+    """src/videos/<カテゴリid>/ を走査して {カテゴリid: [ファイル名, ...]} を返す。
+
+    カテゴリ id はフォルダ名そのもの。data.js を読まずに済ませたいので、
+    src/videos/ の下にあるフォルダはそのまま候補として扱う
+    （動作確認用の sample/ だけは除く）。
+    並び順はファイル名順なので、頭に 01_ などを付ければ制御できる。
+    """
+    base = os.path.join(ROOT, "src", "videos")
+    found = {}
+    if not os.path.isdir(base):
+        return found
+
+    for name in sorted(os.listdir(base)):
+        folder = os.path.join(base, name)
+        if name.startswith(".") or name == "sample" or not os.path.isdir(folder):
+            continue
+        files = sorted(
+            f for f in os.listdir(folder)
+            if not f.startswith(".") and f.lower().endswith(VIDEO_EXT)
+        )
+        if files:
+            found[name] = files
+    return found
+
+
+def videos_js():
+    """フォルダの中身を data.js が読める形の JS にする"""
+    body = json.dumps(scan_videos(), ensure_ascii=False, indent=2)
+    return (
+        "/* serve.py が自動生成 — src/videos/<カテゴリid>/ の中身。手で編集しても上書きされる */\n"
+        "window.HIDD_VIDEO_FILES = %s;\n" % body
+    )
 
 
 class RangeHandler(http.server.SimpleHTTPRequestHandler):
@@ -32,6 +80,9 @@ class RangeHandler(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
     def send_head(self):
+        if self.path.split("?")[0] == VIDEOS_JS:
+            return self.send_videos_js()
+
         rng = self.headers.get("Range")
         if not rng:
             return super().send_head()
@@ -77,6 +128,25 @@ class RangeHandler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
         f.seek(start)
         return _Limited(f, end - start + 1)
+
+    def send_videos_js(self):
+        """フォルダを走査した結果をその場で返す。
+
+        同じ内容をディスクにも書いておく。src/index.html を file:// で
+        直接開いたときは、この書き出した分が使われる。
+        """
+        body = videos_js().encode("utf-8")
+        try:
+            with open(os.path.join(ROOT, "src", "js", "videos.js"), "wb") as out:
+                out.write(body)
+        except OSError:
+            pass    # 読み取り専用の場所に置かれていても配信は続ける
+
+        self.send_response(200)
+        self.send_header("Content-Type", "application/javascript; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        return io.BytesIO(body)
 
 
 class _Limited:
