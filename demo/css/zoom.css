@@ -1,0 +1,59 @@
+/* HIDD — 球体のズーム デモ（検討用）
+   球体・星の見た目は css/stars.css を共有し、ここでは差分だけ足す。 */
+
+/* ---------------- 描画領域 ----------------
+   stars.css の既定は 560px 角のラップに 8% の内側余白（＝キャンバス 400px 角）。
+   これだとズーム 83% あたりで球がキャンバスをはみ出し、四角く切り取られてしまう。
+   さらに星と星座線はキャンバスの外側の要素なので切られず、
+   球の四角い断面の上をまたいでページの端まで伸びてしまっていた。
+
+   そこで、
+     1. 描画領域をページの横幅いっぱい・縦にも広く取り直す（同じ倍率でも球が大きく見える）
+     2. キャンバス・星・星座線を同じ枠（inset: 0）に揃える
+     3. ラップで切る（overflow: hidden）ことで、3 つとも同じ境界で切れるようにする
+   としている。寄り切ったときは「画面いっぱいに球が来ている」見え方になる。 */
+
+.page-zoom .sphere-wrap {
+  width: 100%;
+  max-width: 1180px;
+  height: min(72vh, 760px);
+  overflow: hidden;
+}
+
+/* 3 つとも必ず同じ値にすること（星の座標計算がキャンバス基準のため） */
+.page-zoom .sphere-canvas,
+.page-zoom .constellations,
+.page-zoom .overlay {
+  inset: 0;
+}
+
+/* 角丸は円形のキャンバスを想定した指定で、全面描画では意味がないので戻す */
+.page-zoom .sphere-canvas {
+  border-radius: 0;
+}
+
+/* ---------------- 操作パネル ---------------- */
+
+.zoom-btns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.zoom-btns .sd-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.zoom-readout {
+  min-width: 3.4em;
+  text-align: center;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-mute);
+}

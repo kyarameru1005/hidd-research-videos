@@ -1,0 +1,9 @@
+/* HIDD — 球体の慣性 デモ（検討用）
+   球体・星の見た目は css/stars.css を共有し、ここでは角速度の読み上げ分だけ足す。 */
+
+.speed-readout {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-mute);
+  letter-spacing: .02em;
+}

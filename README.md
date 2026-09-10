@@ -38,9 +38,11 @@ src/                本番サイト（これ単体で完結して動く）
 
 demo/               検討用の比較・試作ページ（本番からは独立）
   index.html          デモ一覧
-  texture.html        球体テクスチャ 6 案
-  category-ui.html    動画一覧ページの UI 6 案
-  stars.html          星 + 放置時の自動再生
+  texture.html        球体テクスチャ 6 案（採用済み）
+  category-ui.html    動画一覧ページの UI 6 案（採用済み）
+  stars.html          星 + 放置時の自動再生（採用済み）
+  zoom.html           球体のズーム（採用済み）
+  inertia.html        球体の慣性（採用済み）
 
 docs/               ドキュメント
   requirements.md     最初に受け取った要件メモ（原文）

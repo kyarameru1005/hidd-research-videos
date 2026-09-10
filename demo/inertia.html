@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>球体の慣性 デモ — HIDD</title>
+<link rel="stylesheet" href="../src/css/common.css">
+<link rel="stylesheet" href="css/stars.css">
+<link rel="stylesheet" href="css/inertia.css">
+</head>
+<body class="page-stars">
+
+<div class="bg-glow"></div>
+
+<header class="sd-header">
+  <a class="sd-back" href="index.html">&larr; デモ一覧に戻る</a>
+  <h1 class="sd-title">球体の慣性 デモ</h1>
+  <p class="sd-lead">
+    球体を勢いよく回してから指を離すと、そのまま余力で回り続けます。
+    <strong>既定は一番強い「重い（弾み車）」</strong>です。
+    本番（<code>現在と同じ</code>）は 0.3 秒ほどで止まる短い減衰なので、
+    比較できるよう 3 段階を残してあります。
+  </p>
+  <p class="sd-note">
+    検討用のページです。本番の <code>index.html</code> には手を入れていません。<br>
+    回転中は右上に角速度を表示しているので、数値でも比較できます。
+  </p>
+</header>
+
+<div class="sd-controls">
+  <div class="sd-controls__inner">
+    <div class="sd-ctl">
+      <span class="sd-ctl__label">回転の重さ</span>
+      <div class="sd-seg" id="segFriction">
+        <button type="button" data-v="0.06" aria-pressed="false">現在と同じ</button>
+        <button type="button" data-v="0.68" aria-pressed="false">ふつう</button>
+        <button type="button" data-v="0.84" aria-pressed="true">重い（弾み車）</button>
+      </div>
+    </div>
+    <div class="sd-ctl sd-ctl--push">
+      <span class="speed-readout" id="speedReadout" hidden></span>
+    </div>
+  </div>
+</div>
+
+<main class="sd-stage" id="stage">
+  <div class="sd-status" id="status">勢いよくドラッグして離してみてください</div>
+
+  <div class="sphere-wrap" id="sphereWrap">
+    <div class="sphere-canvas" id="sphereCanvas"
+         role="application"
+         aria-label="星の球体。ドラッグまたは矢印キーで回転します。離すと慣性で回り続けます。"
+         tabindex="0"></div>
+
+    <svg class="constellations" id="constellations" aria-hidden="true"></svg>
+
+    <div class="overlay" id="overlay" aria-hidden="true">
+      <div class="brand" data-anchor="brand">HIDD</div>
+    </div>
+  </div>
+
+  <nav class="sd-nav" aria-label="カテゴリ">
+    <ul id="navList"></ul>
+  </nav>
+</main>
+
+<div class="fallback" id="fallback" hidden>
+  このブラウザでは WebGL が使えないため、球体を表示できません。
+</div>
+
+<script src="../src/vendor/three.min.js"></script>
+<script src="../src/js/data.js"></script>
+<script src="../src/js/geometry.js"></script>
+<script src="../src/js/texture-lab.js"></script>
+<script src="js/inertia.js"></script>
+</body>
+</html>
