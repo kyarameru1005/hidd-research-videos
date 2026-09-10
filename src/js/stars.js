@@ -40,6 +40,10 @@
   var TOUR_RAD_PER_SEC = 0.35;
   var SNAP_MS = 620;
 
+  /* 惰性がこの速さまで落ちたら「もう自分で回していない」と見なし、
+     そこから無操作の時間を数え始める（巡回と同じ速さを基準にしている）。 */
+  var SETTLE_RAD_PER_SEC = TOUR_RAD_PER_SEC;
+
   /* 手を離したあとの減衰。1 に近いほど長く回り続ける。
      0.84 は半減期およそ 4 秒（demo/inertia.html の「重い（弾み車）」）。 */
   var FRICTION = 0.84;
@@ -55,7 +59,8 @@
   /* 回転まわりの計算は js/geometry.js に集約している */
   var G = window.HIDDGeom;
   var clamp = G.clamp, smoothstep = G.smoothstep, easeInOutCubic = G.easeInOutCubic,
-      shortestAngle = G.shortestAngle, facingAngles = G.facingAngles, hasWebGL = G.hasWebGL;
+      shortestAngle = G.shortestAngle, facingAngles = G.facingAngles,
+      spinSettleMs = G.spinSettleMs, hasWebGL = G.hasWebGL;
 
   /* 再現性のある擬似乱数（読み込むたびに星の配置が変わらないように） */
   function seeded(seed) {
@@ -270,6 +275,7 @@
   var idleTimer = null, playTimer = null;
   var current = null;            /* 再生中のエントリ */
   var watchdog = null;           /* 再生が進まないときに次へ送る番人 */
+  var openTimer = null;          /* カードを開く合図（is-open を付ける）のタイマー */
   var bag = null;                /* 未再生の動画（シャッフル済み）。null は未初期化 */
 
   var intro = null;
@@ -531,8 +537,13 @@
 
     /* カードは星の位置（正面＝中央）から生える。
        hidden を外した直後に class を足すと transition が走らないので 1 拍置くが、
-       rAF はタブが非表示だと止まってカードが開かないままになる。必ず setTimeout で。 */
-    setTimeout(function () { grow.classList.add('is-open'); }, 20);
+       rAF はタブが非表示だと止まってカードが開かないままになる。必ず setTimeout で。
+       この待ちのあいだに閉じられることがあるので、closeCard が取り消せるよう控えておく。 */
+    if (openTimer) clearTimeout(openTimer);
+    openTimer = setTimeout(function () {
+      openTimer = null;
+      grow.classList.add('is-open');
+    }, 20);
 
     if (entry.file) {
       playLocal(entry);
@@ -636,6 +647,11 @@
 
   function closeCard() {
     stopWatchdog();
+    /* 開く合図がまだ発火していないなら取り消す。
+       これを消さないと、閉じた直後に遅れて is-open が付き、
+       下の後始末が「まだ開いている」と判断してカードが閉じないまま残る。
+       タブが非表示だと setTimeout が 1 秒以上遅らされるので、実際に起きる。 */
+    if (openTimer) { clearTimeout(openTimer); openTimer = null; }
     grow.classList.remove('is-open');
     sphereWrap.classList.remove('is-playing');
     var v = growPlayer.querySelector('video');
@@ -708,7 +724,25 @@
     tour = null;
     if (phase === 'playing') closeCard();
     setPhase('idle');
+    armIdle();
+  }
+
+  /**
+   * 無操作の計測を始める。
+   *
+   * 判断の材料はイベントの有無だけではなく、球体が動いているかどうかも見る。
+   *   - 掴んでいるあいだ（ドラッグ・ピンチ）は始めない。
+   *     pointermove はイベントが来続けるだけで noteActivity を呼ばないので、
+   *     長く引きずっていると無操作と見なされ、触っている最中に動画が始まっていた。
+   *     指を離したところ（endDrag）で測り直す。
+   *   - 手を離したあとの惰性で回っているあいだも「操作中」とみなし、
+   *     巡回と同じ速さまで落ちてから IDLE_MS を数える。
+   *     惰性の減り方は式で解けるので、rAF の進み具合には頼らない。
+   */
+  function armIdle() {
     if (reduceMotion) return;
+    if (dragging || pinchPointers.size >= 2) return;
+    var wait = IDLE_MS + spinSettleMs(velYaw, velPitch, SETTLE_RAD_PER_SEC, FRICTION);
     idleTimer = setTimeout(function () {
       idleTimer = null;
       if (document.hidden) return;
@@ -724,7 +758,7 @@
         if (document.hidden) return;
         pickAndPlay(nextEntry());
       }, PLAY_MS);
-    }, IDLE_MS);
+    }, wait);
   }
 
   /* ---------------- 操作 ---------------- */
@@ -772,19 +806,29 @@
   });
 
   function endDrag(e) {
+    var wasPinching = pinchPointers.size >= 2;
     pinchPointers.delete(e.pointerId);
     if (pinchPointers.size < 2) pinchDist = null;
 
-    if (!dragging || (pointerId !== null && e.pointerId !== pointerId)) return;
+    if (!dragging || (pointerId !== null && e.pointerId !== pointerId)) {
+      /* ピンチ中は dragging を落としてあるので、指を離してもここで返る。
+         測り直さないと無操作の計測がいつまでも始まらない。 */
+      if (wasPinching) noteActivity();
+      return;
+    }
     dragging = false; pointerId = null;
     host.classList.remove('is-dragging');
     if (performance.now() - lastT > 90) { velYaw = 0; velPitch = 0; }
     velYaw = clamp(velYaw, -6, 6); velPitch = clamp(velPitch, -6, 6);
-    noteActivity();
+    noteActivity();      /* 惰性が落ち着くところから数え直す */
     requestRender();
   }
-  host.addEventListener('pointerup', endDrag);
-  host.addEventListener('pointercancel', endDrag);
+  /* 掴んでいるあいだは無操作にしないので、離したことを取りこぼすと
+     巡回が二度と始まらない。球体の外で離しても拾えるよう window で受ける
+     （setPointerCapture が失敗した場合の保険）。dragging と pointerId で
+     見張っているため、関係ない場所での pointerup は素通りする。 */
+  window.addEventListener('pointerup', endDrag);
+  window.addEventListener('pointercancel', endDrag);
   host.addEventListener('lostpointercapture', endDrag);
 
   /* ホイールでズーム。Ctrl 併用はブラウザのページ拡大操作なので横取りしない */

@@ -166,10 +166,17 @@
   /* transform / opacity は JS が毎フレーム書くので transition を掛けない */
 }
 
-/* ---------- 星から生えるカード ---------- */
+/* ---------- 星から生える再生カード（動画は表示領域いっぱい） ----------
 
+   動画をできるだけ大きく見せることを最優先にしている。
+   カテゴリ名・タイトル・発表者は動画の上に重ねる。行として置くと、
+   その分だけ確実に動画が小さくなるため。
+
+   .sphere-wrap（max-width 1180px / overflow: hidden）の中にあるので、
+   absolute のままだと球体の枠に閉じ込められる。fixed で表示領域まで広げる。
+   下のカテゴリナビは隠れてよい、という判断。 */
 .grow {
-  position: absolute;
+  position: fixed;
   inset: 0;
   display: grid;
   place-items: center;
@@ -178,48 +185,84 @@
 .grow[hidden] { display: none; }
 
 .grow__card {
-  width: min(430px, 88%);
-  padding: 14px;
-  background: rgba(9, 11, 22, .96);
-  border: 1px solid var(--border-hi);
-  border-radius: 14px;
-  box-shadow: 0 24px 70px rgba(0, 0, 0, .65);
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  background: #000;
+  overflow: hidden;
   transform: scale(.4);
   opacity: 0;
   transition: transform .38s var(--ease), opacity .3s var(--ease);
 }
 .grow.is-open .grow__card { transform: scale(1); opacity: 1; }
 
-.grow__head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
-.grow__lab { flex: 1; font-size: 11px; letter-spacing: .12em; color: var(--cat); font-weight: 700; }
-.grow__close {
-  flex: 0 0 auto; width: 28px; height: 28px; font-size: 18px; line-height: 1;
-  color: var(--fg-mute); background: transparent;
-  border: 1px solid var(--border); border-radius: 7px; cursor: pointer;
-}
-.grow__close:hover { color: #fff; border-color: var(--border-hi); }
-
-.grow__title { margin: 0 0 10px; font-size: 15px; font-weight: 700; line-height: 1.5; }
-
+/* カードを埋める。aspect-ratio は使わない
+   （枠の比率を決め打ちすると、画面の比率と合わないときに無駄な場所ができる。
+     動画の比率は object-fit: contain に任せる） */
 .grow__player {
-  position: relative; width: 100%; aspect-ratio: 16 / 9;
-  background: #000; border-radius: 9px; overflow: hidden;
-}
-@supports not (aspect-ratio: 16 / 9) {
-  .grow__player { height: 0; padding-bottom: 56.25%; }
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  background: #000;
+  overflow: hidden;
 }
 .grow__player video,
-.grow__player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+.grow__player iframe {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  border: 0; display: block; object-fit: contain;
+}
 .grow__player .no-file {
   position: absolute; inset: 0; display: grid; place-items: center; padding: 16px;
   font-size: 12px; color: var(--fg-dim); text-align: center; line-height: 1.7;
   background: rgba(0, 0, 0, .55);
 }
 
-.grow__summary { margin: 10px 0 0; font-size: 12.5px; color: var(--fg-mute); line-height: 1.7; }
+/* 動画の上に重ねる文字。pointer-events: none にして、
+   動画そのものの操作（再生・シーク）を邪魔しないようにする。 */
+.grow__info {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 2;
+  padding: 18px 20px 40px;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, .82), rgba(0, 0, 0, 0));
+  pointer-events: none;
+}
 
-.grow__bar { margin-top: 10px; height: 2px; background: rgba(255,255,255,.12); border-radius: 2px; overflow: hidden; }
-.grow__bar span { display: block; height: 100%; width: 0; background: var(--cat); transition: width .2s linear; }
+.grow__head { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.grow__lab {
+  flex: 1; font-size: 11px; letter-spacing: .12em; font-weight: 700;
+  color: var(--cat); text-shadow: 0 1px 3px rgba(0, 0, 0, .9);
+}
+
+/* 全画面なので、閉じる手段はこのボタンと Esc だけ。
+   動画の上でも埋もれないよう下地と枠を付け、重ねた文字の中でここだけ操作を受ける。 */
+.grow__close {
+  pointer-events: auto;
+  flex: 0 0 auto; width: 34px; height: 34px; font-size: 22px; line-height: 1;
+  color: #fff; background: rgba(0, 0, 0, .45);
+  border: 1px solid rgba(255, 255, 255, .3); border-radius: 8px; cursor: pointer;
+}
+.grow__close:hover { background: rgba(0, 0, 0, .7); border-color: #fff; }
+
+.grow__title {
+  margin: 0; max-width: 70ch;
+  font-size: 16px; font-weight: 700; line-height: 1.5;
+  color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, .9);
+}
+
+.grow__summary {
+  margin: 6px 0 0; max-width: 70ch;
+  font-size: 12.5px; line-height: 1.7;
+  color: rgba(255, 255, 255, .8); text-shadow: 0 1px 3px rgba(0, 0, 0, .9);
+}
+
+/* 進捗は画面最上端の細い線にする。動画自体のコントロール（下端）と重ならない位置。 */
+.grow__bar {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 3;
+  height: 3px; background: rgba(255, 255, 255, .15); overflow: hidden;
+}
 
 /* ---------- 状態表示 ---------- */
 
