@@ -14,5 +14,19 @@ tmp/
 # 動画ファイル
 # 実物は Git に入れない（GitHub は 1 ファイル 100MB 上限、リポジトリも肥大化するため）。
 # USB や共有ドライブで配布し、展示機の videos/ に置く。
+# カテゴリ別のフォルダ（src/videos/<カテゴリid>/）は空でも残したいので .gitkeep だけ追跡する。
 src/videos/*
-!src/videos/sample/
+!src/videos/*/
+src/videos/*/*
+!src/videos/*/.gitkeep
+!src/videos/sample/*
+
+# 動画の一時置き場（配布物をダウンロードしてカテゴリ別に振り分けるまでの作業用）
+move/
+
+# 念のため、どこに置かれた動画も追跡しない
+*.mp4
+*.webm
+*.mov
+*.m4v
+!src/videos/sample/*.mp4

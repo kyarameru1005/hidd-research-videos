@@ -144,7 +144,31 @@ test('回転の計算が 1 か所にまとまっている（重複させない�
 test('実物の動画を Git に入れない設定になっている', () => {
   const ignore = read('.gitignore');
   assert.ok(/^src\/videos\/\*$/m.test(ignore), 'src/videos/* が除外されていない');
-  assert.ok(/^!src\/videos\/sample\/$/m.test(ignore), 'sample が除外解除されていない');
+  assert.ok(/^src\/videos\/\*\/\*$/m.test(ignore),
+    'src/videos/<カテゴリid>/ の中身が除外されていない');
+  assert.ok(/^!src\/videos\/sample\/\*$/m.test(ignore), 'sample が除外解除されていない');
+  assert.ok(/^!src\/videos\/\*\/\.gitkeep$/m.test(ignore),
+    '.gitkeep が除外解除されていない。空のカテゴリフォルダが clone 先に残らなくなる');
+});
+
+test('カテゴリごとの動画フォルダが用意されている', () => {
+  const { HIDD_DATA: DATA } = loadBrowserScripts('src/js/data.js');
+  const missing = DATA.categories
+    .map((c) => `src/videos/${c.id}`)
+    .filter((dir) => !existsSync(repoPath(dir)));
+  assert.deepEqual(missing, [], 'フォルダが無いカテゴリがある（動画を置く場所が無い）');
+});
+
+test('videos.js を data.js より先に読んでいる', () => {
+  // 逆だと data.js が読む window.HIDD_VIDEO_FILES がまだ未定義で、
+  // フォルダに動画を置いても反映されない（見た目は今までどおり動くので気づきにくい）
+  for (const html of ['src/index.html', 'src/category.html']) {
+    const code = read(html);
+    const videos = code.indexOf('js/videos.js');
+    const data = code.indexOf('js/data.js');
+    assert.ok(videos >= 0, `${html} が js/videos.js を読んでいない`);
+    assert.ok(videos < data, `${html} が videos.js を data.js より後に読んでいる`);
+  }
 });
 
 test('デモが使う確認用動画が全て存在する', () => {

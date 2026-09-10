@@ -3,7 +3,7 @@
  *
  * ?cat=<id> を読んで data.js から該当カテゴリを引き、
  * 動画を横スクロールのフィルムストリップとして並べる。
- * コマを押すとモーダル内の iframe で Google ドライブの動画を再生する。
+ * コマを押すとモーダル内の <video> でローカル動画を再生する。
  */
 (function () {
   'use strict';
@@ -26,7 +26,7 @@
 
   var modal      = document.getElementById('modal');
   var modalTitle = document.getElementById('modalTitle');
-  var modalFrame = document.getElementById('modalFrame');
+  var modalPlayer = document.getElementById('modalPlayer');
   var modalOpen  = document.getElementById('modalOpen');
   var modalClose = modal.querySelector('.modal__close');
 
@@ -81,8 +81,7 @@
   }
 
   videos.forEach(function (video, i) {
-    var previewUrl = DATA.videoUrl(video, 'preview');
-    var viewUrl    = DATA.videoUrl(video, 'view');
+    var file = DATA.videoFile(video);
 
     /* button の中に見出しは置けないので、コマ全体を 1 つのボタンとして読ませる */
     var panel = document.createElement('button');
@@ -98,14 +97,14 @@
     body.appendChild(span('film__title', video.title));
     if (video.summary) body.appendChild(span('film__summary', video.summary));
 
-    if (previewUrl) {
+    if (file) {
       body.appendChild(span('film__play', '再生'));
       panel.addEventListener('click', function () {
-        openModal(video.title, previewUrl, viewUrl, panel);
+        openModal(video.title, file, panel);
       });
     } else {
-      /* URL 未設定（ダミーのまま）でも見た目が壊れないようにしておく */
-      body.appendChild(span('film__missing', '動画リンク未設定'));
+      /* 動画ファイル未配置（ダミーのまま）でも見た目が壊れないようにしておく */
+      body.appendChild(span('film__missing', '動画ファイル未配置'));
       panel.disabled = true;
     }
 
@@ -182,20 +181,23 @@
 
   /* ---------------- モーダル ---------------- */
 
-  function openModal(title, previewUrl, viewUrl, trigger) {
+  function openModal(title, file, trigger) {
     lastFocused = trigger || document.activeElement;
     modalTitle.textContent = title;
-    modalFrame.src = previewUrl;
-    modalOpen.href = viewUrl || previewUrl;
+    modalPlayer.src = file;
+    modalOpen.href = file;
     modal.hidden = false;
     document.body.style.overflow = 'hidden';
+    modalPlayer.play().catch(function () {});
     modalClose.focus();
   }
 
   function closeModal() {
     if (modal.hidden) return;
     modal.hidden = true;
-    modalFrame.src = 'about:blank';   /* 再生を確実に止める */
+    modalPlayer.pause();
+    modalPlayer.removeAttribute('src');
+    modalPlayer.load();   /* src を外しても再生位置と読み込みが残るので明示的に破棄する */
     document.body.style.overflow = '';
     if (lastFocused && lastFocused.focus) lastFocused.focus();
   }
