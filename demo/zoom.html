@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>球体のズーム デモ — HIDD</title>
+<link rel="stylesheet" href="../src/css/common.css">
+<link rel="stylesheet" href="css/stars.css">
+<link rel="stylesheet" href="css/zoom.css">
+</head>
+<body class="page-stars">
+
+<div class="bg-glow"></div>
+
+<header class="sd-header">
+  <a class="sd-back" href="index.html">&larr; デモ一覧に戻る</a>
+  <h1 class="sd-title">球体のズーム デモ</h1>
+  <p class="sd-lead">
+    ホイール（トラックパッドは 2 本指スワイプ）でズーム、タッチはピンチで拡大縮小できます。
+    ボタンでも同じことができるので、マウス操作の確認にも使えます。
+  </p>
+  <p class="sd-note">
+    検討用のページです。本番の <code>index.html</code> には手を入れていません。<br>
+    星の配置・動作（ドラッグ回転・慣性）は本番と同じにしています。ズームだけがこのデモの新規部分です。
+  </p>
+</header>
+
+<div class="sd-controls">
+  <div class="sd-controls__inner">
+    <div class="sd-ctl">
+      <span class="sd-ctl__label">ズーム</span>
+      <div class="zoom-btns">
+        <button class="sd-btn" type="button" id="btnZoomOut" aria-label="縮小">&minus;</button>
+        <span class="zoom-readout" id="zoomReadout">58%</span>
+        <button class="sd-btn" type="button" id="btnZoomIn" aria-label="拡大">&plus;</button>
+      </div>
+    </div>
+    <div class="sd-ctl sd-ctl--push">
+      <button class="sd-btn" type="button" id="btnZoomReset">既定に戻す</button>
+    </div>
+  </div>
+</div>
+
+<main class="sd-stage" id="stage">
+  <div class="sd-status" id="status">ドラッグで回転 ／ ホイールかピンチでズーム</div>
+
+  <div class="sphere-wrap" id="sphereWrap">
+    <div class="sphere-canvas" id="sphereCanvas"
+         role="application"
+         aria-label="星の球体。ドラッグまたは矢印キーで回転、ホイールまたはピンチでズームします。"
+         tabindex="0"></div>
+
+    <svg class="constellations" id="constellations" aria-hidden="true"></svg>
+
+    <div class="overlay" id="overlay" aria-hidden="true">
+      <div class="brand" data-anchor="brand">HIDD</div>
+    </div>
+  </div>
+
+  <nav class="sd-nav" aria-label="カテゴリ">
+    <ul id="navList"></ul>
+  </nav>
+</main>
+
+<div class="fallback" id="fallback" hidden>
+  このブラウザでは WebGL が使えないため、球体を表示できません。
+</div>
+
+<script src="../src/vendor/three.min.js"></script>
+<script src="../src/js/data.js"></script>
+<script src="../src/js/geometry.js"></script>
+<script src="../src/js/texture-lab.js"></script>
+<script src="js/zoom.js"></script>
+</body>
+</html>

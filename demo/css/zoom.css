@@ -1,0 +1,26 @@
+/* HIDD — 球体のズーム デモ（検討用）
+   球体・星の見た目は css/stars.css を共有し、ここではズーム操作パネルの分だけ足す。 */
+
+.zoom-btns {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.zoom-btns .sd-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.zoom-readout {
+  min-width: 3.4em;
+  text-align: center;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--fg-mute);
+}
