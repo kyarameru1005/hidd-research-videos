@@ -148,18 +148,20 @@
 .star__tip--left  { top: 50%; bottom: auto; left: auto; right: 16px; transform: translateY(-50%); }
 .star:hover .star__tip { opacity: 1; }
 
-/* ---------- 中央の HIDD ---------- */
+/* ---------- 中央の学科名（2 行） ---------- */
 
 .brand {
   position: absolute;
   top: 0; left: 0;
-  font-size: clamp(26px, 5.4vmin, 48px);
+  font-size: clamp(12px, 2.05vmin, 18px);
+  line-height: 1.5;
+  text-align: center;
   font-weight: 800;
-  letter-spacing: .16em;
+  letter-spacing: .02em;
   color: #fff;
-  text-shadow: 0 2px 24px rgba(0, 0, 0, .8);
+  text-shadow: 0 2px 20px rgba(0, 0, 0, .8);
   pointer-events: none;
-  white-space: nowrap;
+  white-space: nowrap;    /* <br> による改行はこの指定でも効く */
   will-change: transform, opacity;
   /* transform / opacity は JS が毎フレーム書くので transition を掛けない */
 }
