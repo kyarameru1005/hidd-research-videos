@@ -21,31 +21,31 @@
 
 /* ---------- 球体 ---------- */
 
+/* ズームで寄ると球はいずれ描画領域からはみ出す（垂直画角が 45 度固定なので
+   camZ < 1/sin(22.5°) ≒ 2.61 で必ず起きる）。小さな枠の中で切れると
+   四角い窓のように見えてしまうため、描画領域は画面いっぱいに取る。
+   キャンバス・星・星座線を同じ枠に揃え、ラップで切って境界を 1 つにしている。 */
 .sphere-wrap {
   position: relative;
-  flex: 0 0 auto;
-  width: min(70vmin, 580px);
-  height: min(70vmin, 580px);
-  /* 星と吹き出しが球の外側へはみ出せるようにする */
-  overflow: visible;
+  flex: 1 1 auto;
+  width: 100%;
+  max-width: 1180px;
+  min-height: 0;           /* flex の子が縮めるようにする */
+  overflow: hidden;
 }
 
 .sphere-canvas {
   position: absolute;
-  /* ラップいっぱいに描かず内側に寄せ、外周を星の吹き出しの居場所にする。
-     .overlay と .constellations も同じ inset にして、
-     座標計算をキャンバス基準のまま使えるようにする。 */
-  inset: 8%;
+  inset: 0;                /* .overlay / .constellations と必ず同じ値にすること */
   cursor: grab;
-  touch-action: none;      /* ドラッグ時にページがスクロールしないように */
-  border-radius: 50%;
+  touch-action: none;      /* ドラッグ・ピンチでページが動かないように */
 }
 .sphere-canvas.is-dragging { cursor: grabbing; }
 .sphere-canvas canvas { display: block; width: 100%; height: 100%; }
 
 .constellations {
   position: absolute;
-  inset: 8%;               /* .sphere-canvas と必ず同じ値にすること */
+  inset: 0;                /* .sphere-canvas と必ず同じ値にすること */
   pointer-events: none;
   overflow: visible;
 }
@@ -56,7 +56,7 @@
 
 .overlay {
   position: absolute;
-  inset: 8%;               /* .sphere-canvas と必ず同じ値にすること */
+  inset: 0;                /* .sphere-canvas と必ず同じ値にすること */
   pointer-events: none;    /* 個々の星だけ有効化する */
 }
 
@@ -358,6 +358,6 @@
 /* ---------- 画面が低いとき ---------- */
 
 @media (max-height: 640px) {
-  .sphere-wrap { width: min(60vmin, 440px); height: min(60vmin, 440px); }
+  /* 球体は残りの高さいっぱいに広がるので、まわりの余白だけ詰める */
   .fallback-nav__title { display: none; }
 }

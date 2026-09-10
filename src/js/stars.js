@@ -20,8 +20,16 @@
   var TAU = Math.PI * 2;
   var HALF_PI = Math.PI / 2;
   var BRAND_R = 1.02;
-  var STAR_R = 1.04;
-  var MAJOR_R = 1.05;
+
+  /* 星は球面ちょうど（半径 1.0）に置く。
+     以前は 1.04 / 1.05 と少し浮かせていたが、これは旧 sphere.js の名残だった。
+     当時マーカーは 3D の THREE.Points で、球に隠れないよう輪郭の外へ押し出す
+     必要があった（docs/decisions.md 参照）。今の星はキャンバスの上に重ねた
+     HTML 要素なので球に隠れることはなく、浮かせるとズームで寄ったときに
+     星だけが輪郭の外へ離れていってしまう。 */
+  var STAR_R = 1.0;
+  var MAJOR_R = 1.0;
+
   var STORE = 'hidd.pos.';        /* 再生位置の保存キー */
 
   /* ---------------- 展示の設定（固定値） ---------------- */
@@ -32,6 +40,15 @@
   var DRIVE_MS = 20000;           /* ドライブ埋め込みは終了を検知できないので時間で送る */
   var TOUR_RAD_PER_SEC = 0.35;
   var SNAP_MS = 620;
+
+  /* 手を離したあとの減衰。1 に近いほど長く回り続ける。
+     0.84 は半減期およそ 4 秒（demo/inertia.html の「重い（弾み車）」）。 */
+  var FRICTION = 0.84;
+
+  /* ズーム（カメラを球の中心へ寄せる・引く）の範囲 */
+  var CAM_DEFAULT = 3.6;
+  var CAM_MIN = 1.75;
+  var CAM_MAX = 7.0;
 
   var reduceMotion = window.matchMedia &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -144,7 +161,8 @@
 
   var scene = new THREE.Scene();
   var camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-  camera.position.set(0, 0, 3.6);
+  var camZ = CAM_DEFAULT;
+  camera.position.set(0, 0, camZ);
 
   var renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
@@ -386,8 +404,9 @@
       }
       busy = true;
     } else if (Math.abs(velYaw) > 0.0004 || Math.abs(velPitch) > 0.0004) {
+      /* 手を離したあとの惰性。FRICTION が 1 に近いほど長く回り続ける */
       yaw += velYaw * dt; pitch += velPitch * dt;
-      velYaw *= Math.pow(0.06, dt); velPitch *= Math.pow(0.06, dt);
+      velYaw *= Math.pow(FRICTION, dt); velPitch *= Math.pow(FRICTION, dt);
       busy = true;
     } else { velYaw = 0; velPitch = 0; }
 
@@ -398,6 +417,9 @@
   /* ---------------- 巡回 ---------------- */
 
   function beginTourLeg() {
+    /* 巡回とスナップの最中は惰性を進めない。消しておかないと、
+       終わった瞬間に古い速度で回り出す（減衰が弱いほど派手に出る）。 */
+    velYaw = 0; velPitch = 0;
     var t = facingAngles(TOUR_STOPS[tourStep % TOUR_STOPS.length]);
     var dYaw = shortestAngle(yaw, t.yaw);
     var dPitch = t.pitch - pitch;
@@ -407,6 +429,7 @@
   }
 
   function snapTo(dir) {
+    velYaw = 0; velPitch = 0;
     var t = facingAngles(dir);
     snap = {
       fromYaw: yaw, fromPitch: pitch,
@@ -414,6 +437,27 @@
       start: performance.now(), dur: SNAP_MS
     };
     tour = null;
+    requestRender();
+  }
+
+  /* ---------------- ズーム ----------------
+     カメラを球の中心へ寄せる・引くだけ（dolly）。
+     星の見え隠れは depth = world.z / radius（ワールド座標の前後方向）で決めていて
+     カメラ距離に依存しないので、見え方の計算式には手を入れていない。 */
+
+  var pinchPointers = new Map();
+  var pinchDist = null;
+
+  function pinchDistance() {
+    var pts = Array.from(pinchPointers.values());
+    return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+  }
+
+  function setZoom(z) {
+    var next = clamp(z, CAM_MIN, CAM_MAX);
+    if (next === camZ) return;
+    camZ = next;
+    camera.position.z = camZ;
     requestRender();
   }
 
@@ -660,7 +704,7 @@
       statusEl.textContent = '動画を選んでいます…';
     } else {
       statusEl.classList.remove('is-live');
-      statusEl.textContent = '球体をドラッグして回す ／ 明るい星がカテゴリ、小さな星が動画';
+      statusEl.textContent = 'ドラッグで回す ／ ホイールかピンチで拡大 ／ 明るい星がカテゴリ、小さな星が動画';
     }
   }
 
@@ -684,6 +728,9 @@
     idleTimer = setTimeout(function () {
       idleTimer = null;
       if (document.hidden) return;
+      /* 無人展示では、来場者が寄せたままの倍率で放置されると
+         そのあとずっと寄ったままになる。巡回に戻るときに既定へ戻す。 */
+      setZoom(CAM_DEFAULT);
       setPhase('tour');
       tourStep = 0;
       beginTourLeg();
@@ -701,6 +748,15 @@
   var DRAG_K = 0.006;
 
   host.addEventListener('pointerdown', function (e) {
+    pinchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    /* 指が 2 本になったらピンチ。回転は止めてズームに切り替える */
+    if (pinchPointers.size >= 2) {
+      dragging = false;
+      pinchDist = pinchDistance();
+      noteActivity();
+      return;
+    }
     if (e.button !== undefined && e.button !== 0) return;
     dragging = true; pointerId = e.pointerId;
     lastX = e.clientX; lastY = e.clientY; lastT = performance.now();
@@ -712,6 +768,14 @@
   });
 
   host.addEventListener('pointermove', function (e) {
+    if (pinchPointers.has(e.pointerId)) pinchPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (pinchPointers.size >= 2) {
+      var d = pinchDistance();
+      if (pinchDist !== null) setZoom(camZ - (d - pinchDist) * 0.012 * camZ);
+      pinchDist = d;
+      return;
+    }
     if (!dragging || e.pointerId !== pointerId) return;
     var now = performance.now();
     var dx = e.clientX - lastX, dy = e.clientY - lastY;
@@ -724,6 +788,9 @@
   });
 
   function endDrag(e) {
+    pinchPointers.delete(e.pointerId);
+    if (pinchPointers.size < 2) pinchDist = null;
+
     if (!dragging || (pointerId !== null && e.pointerId !== pointerId)) return;
     dragging = false; pointerId = null;
     host.classList.remove('is-dragging');
@@ -736,12 +803,22 @@
   host.addEventListener('pointercancel', endDrag);
   host.addEventListener('lostpointercapture', endDrag);
 
+  /* ホイールでズーム。Ctrl 併用はブラウザのページ拡大操作なので横取りしない */
+  host.addEventListener('wheel', function (e) {
+    if (e.ctrlKey) return;
+    e.preventDefault();
+    setZoom(camZ + e.deltaY * 0.0022 * camZ);
+    noteActivity();
+  }, { passive: false });
+
   host.addEventListener('keydown', function (e) {
     var step = 0.22, ok = true;
     if (e.key === 'ArrowLeft') yaw -= step;
     else if (e.key === 'ArrowRight') yaw += step;
     else if (e.key === 'ArrowUp') pitch = clamp(pitch - step, -HALF_PI, HALF_PI);
     else if (e.key === 'ArrowDown') pitch = clamp(pitch + step, -HALF_PI, HALF_PI);
+    else if (e.key === '+' || e.key === '=') { setZoom(camZ * 0.9); noteActivity(); ok = false; }
+    else if (e.key === '-' || e.key === '_') { setZoom(camZ / 0.9); noteActivity(); ok = false; }
     else ok = false;
     if (ok) { e.preventDefault(); noteActivity(); snap = null; requestRender(); }
   });
