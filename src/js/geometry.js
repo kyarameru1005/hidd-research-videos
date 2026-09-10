@@ -61,6 +61,22 @@ window.HIDDGeom = (function () {
     ];
   }
 
+  /**
+   * 手を離したあとの惰性が settle まで落ちるのに要する時間（ミリ秒）。
+   *
+   * 速度は 1 秒あたり friction 倍に減る（v(t) = v0 * friction^t）ので、
+   * v0 * friction^t = settle を解いて t = log(settle / v0) / log(friction)。
+   * すでに settle 以下、または値が不正なら 0。
+   *
+   * 無操作の計測を「球体が止まってから」始めるために使う。
+   * rAF に頼らず先に時間が求まるので、タブが非表示でも計算が狂わない。
+   */
+  function spinSettleMs(velYaw, velPitch, settle, friction) {
+    var v = Math.max(Math.abs(velYaw), Math.abs(velPitch));
+    if (!(settle > 0) || !(friction > 0) || friction >= 1 || !(v > settle)) return 0;
+    return (Math.log(settle / v) / Math.log(friction)) * 1000;
+  }
+
   function hasWebGL() {
     if (typeof document === 'undefined') return false;
     try {
@@ -81,6 +97,7 @@ window.HIDDGeom = (function () {
     shortestAngle: shortestAngle,
     facingAngles: facingAngles,
     rotate: rotate,
+    spinSettleMs: spinSettleMs,
     hasWebGL: hasWebGL
   };
 })();

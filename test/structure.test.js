@@ -139,6 +139,28 @@ test('回転の計算が 1 か所にまとまっている（重複させない�
   }
 });
 
+test('無操作の判定が、掴んでいる間と惰性で回っている間を除いている', () => {
+  // pointermove は noteActivity を呼ばないので、以前は長くドラッグしていると
+  // 無操作と見なされ、球体を触っている最中に自動再生が始まっていた。
+  const code = read('src/js/stars.js');
+  const body = code.match(/function armIdle\(\)\s*\{([\s\S]*?)\n  \}/);
+  assert.ok(body, 'src/js/stars.js に armIdle が無い（無操作の計測開始は 1 か所にまとめる）');
+  assert.ok(/\bdragging\b/.test(body[1]) && /pinchPointers/.test(body[1]),
+    'armIdle が掴んでいる状態を見ていない。ドラッグ中に自動再生が始まる');
+  assert.ok(/spinSettleMs/.test(body[1]),
+    'armIdle が惰性の残りを見ていない。まだ回っているのに無操作と見なされる');
+});
+
+test('ドラッグの終わりを window でも受けている（取りこぼすと巡回が戻らない）', () => {
+  // 掴んでいる間は無操作にしないので、pointerup を逃すと idle の計測が始まらない。
+  // 球体の外で離した場合に備えて window でも拾う。
+  const code = read('src/js/stars.js');
+  assert.ok(/window\.addEventListener\('pointerup',\s*endDrag\)/.test(code),
+    'src/js/stars.js が pointerup を window で受けていない');
+  assert.ok(/window\.addEventListener\('pointercancel',\s*endDrag\)/.test(code),
+    'src/js/stars.js が pointercancel を window で受けていない');
+});
+
 /* --- 動画まわり --- */
 
 test('実物の動画を Git に入れない設定になっている', () => {
