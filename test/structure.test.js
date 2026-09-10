@@ -132,6 +132,28 @@ test('横送りの状態更新を scroll イベントだけに任せていない
     'scroll イベントはタブ非表示だと来ないので、ボタンが押せなくなる');
 });
 
+test('フィルムストリップの流れの再開を setTimeout で出している', () => {
+  // 手で送ったあとの再開を scroll イベントや rAF の完了に紐づけると、
+  // タブが隠れている間は合図が届かず、止まったままになる
+  const body = read('src/js/category.js').match(/function nudge\(\)\s*\{([\s\S]*?)\n  \}/);
+  assert.ok(body, 'src/js/category.js に nudge が無い（手で動かしたときの一時停止は 1 か所にまとめる）');
+  assert.ok(/setTimeout\(/.test(body[1]), 'nudge が流れの再開を setTimeout で予約していない');
+});
+
+test('循環中はスクロールスナップを外している', () => {
+  // mandatory のままだと、流すたびに最寄りのコマの頭へ引き戻されて進まない
+  assert.ok(/\.strip__track\.is-loop\s*\{[^}]*scroll-snap-type:\s*none/.test(read('src/css/category.css')),
+    'src/css/category.css の .strip__track.is-loop が scroll-snap-type: none になっていない');
+});
+
+test('循環用に複製したコマを Tab と読み上げから外している', () => {
+  // 外さないと、同じ動画が何度も Tab でたどられ、読み上げられる
+  const body = read('src/js/category.js').match(/function makePanel\([^)]*\)\s*\{([\s\S]*?)\n  \}/);
+  assert.ok(body, 'src/js/category.js に makePanel が無い（本物と複製は同じ関数で作る）');
+  assert.ok(/tabIndex\s*=\s*-1/.test(body[1]) && /aria-hidden/.test(body[1]),
+    '複製のコマに tabIndex = -1 と aria-hidden が付いていない');
+});
+
 test('回転の計算が 1 か所にまとまっている（重複させない）', () => {
   for (const f of ['src/js/stars.js', 'demo/js/stars.js']) {
     assert.ok(!/^\s*function facingAngles/m.test(read(f)),
