@@ -264,6 +264,140 @@
   height: 3px; background: rgba(255, 255, 255, .15); overflow: hidden;
 }
 
+/* ---------- 左上の見出しとメニュー ---------- */
+
+/* 球体は画面いっぱいに広がっているので、見出しは重ねて置く。
+   z-index は再生カード（500）より下、イントロの幕（10）より下に収める。 */
+.site-head {
+  position: fixed;
+  top: clamp(10px, 2vh, 18px);
+  left: clamp(12px, 2.4vw, 24px);
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: clamp(8px, 1.2vw, 14px);
+}
+
+/* ロゴは背景を透過させた PNG を使う（img/HIDD-mark.png）。
+   元の HIDD.png は黒地に白抜きで、そのまま置くと暗い背景の上で四角い縁が出る。
+   mix-blend-mode: screen では消せない（.site-head が position: fixed + z-index で
+   合成を閉じてしまい、ページの背景まで届かない）。 */
+.site-head__logo {
+  display: block;
+  height: clamp(26px, 3.4vh, 36px);
+  width: auto;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.menu-btn {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0;
+  color: var(--fg-mute);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  cursor: pointer;
+  transition: color 0.2s var(--ease), border-color 0.2s var(--ease),
+              background-color 0.2s var(--ease);
+}
+.menu-btn:hover { color: #fff; border-color: var(--border-hi); background: var(--surface-hi); }
+
+.menu-btn__bar {
+  display: block;
+  width: 17px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: currentColor;
+  transition: transform 0.22s var(--ease), opacity 0.16s var(--ease);
+}
+
+/* 開いているあいだは × にする */
+.menu-btn.is-open { color: #fff; border-color: var(--border-hi); }
+.menu-btn.is-open .menu-btn__bar:nth-child(1) { transform: translateY(5.5px) rotate(45deg); }
+.menu-btn.is-open .menu-btn__bar:nth-child(2) { opacity: 0; }
+.menu-btn.is-open .menu-btn__bar:nth-child(3) { transform: translateY(-5.5px) rotate(-45deg); }
+
+/* 開閉は display の切り替えではなく visibility で行う。
+   hidden 属性をタイマーで外す作り方は、遅延したときに開いたまま／
+   閉じたままになる（docs/decisions.md の 5 回目の落とし穴）。 */
+.menu-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  width: min(320px, calc(100vw - 32px));
+  padding: 14px;
+  background: rgba(10, 12, 24, 0.92);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(10px);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-8px);
+  transition: opacity 0.18s var(--ease), transform 0.22s var(--ease),
+              visibility 0.22s var(--ease);
+}
+.menu-panel.is-open {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+}
+
+.menu-panel__title {
+  margin: 0 0 10px;
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  color: var(--fg-dim);
+  text-transform: uppercase;
+}
+
+.menu-panel__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.menu-panel__link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--fg-mute);
+  border: 1px solid transparent;
+  transition: color 0.18s var(--ease), background-color 0.18s var(--ease),
+              border-color 0.18s var(--ease);
+}
+.menu-panel__link:hover,
+.menu-panel__link:focus-visible {
+  color: #fff;
+  background: var(--surface-hi);
+  border-color: var(--cat-accent, var(--border-hi));
+}
+
+/* カテゴリの色。星と同じ色を使って対応が分かるようにする */
+.menu-panel__dot {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cat-accent, var(--fg-dim));
+  box-shadow: 0 0 8px 1px var(--cat-accent, transparent);
+}
+
 /* ---------- 状態表示 ---------- */
 
 .status {
@@ -278,9 +412,12 @@
 .status b { color: var(--fg-mute); font-weight: 700; }
 .status.is-live { color: var(--accent-ai); }
 
-/* ---------- フォールバック / キーボード用ナビ ---------- */
+/* ---------- フォールバック用ナビ ---------- */
 
+/* 3D が動く環境では左上のメニューが導線なので、球体の下には並べない。
+   要素は残す（WebGL 非対応時の導線であり、下の .no-webgl で出す）。 */
 .fallback-nav {
+  display: none;
   flex: 0 0 auto;
   width: 100%;
   max-width: 900px;
@@ -324,6 +461,8 @@
 /* WebGL が使えないときは球体を隠してカード表示に切り替える */
 .no-webgl .sphere-wrap,
 .no-webgl .status { display: none; }
+
+.no-webgl .fallback-nav { display: block; }
 
 .no-webgl .fallback-nav__title { font-size: 13px; letter-spacing: 0.08em; margin-bottom: 20px; }
 .no-webgl .fallback-nav__list { flex-direction: column; align-items: stretch; gap: 12px; }
@@ -382,18 +521,19 @@
 .stage { opacity: 0; transition: opacity 0.8s var(--ease); }
 .is-revealed .stage { opacity: 1; }
 
-.status, .fallback-nav {
+.status, .fallback-nav, .site-head {
   opacity: 0;
   transform: translateY(8px);
   transition: opacity 0.7s var(--ease), transform 0.7s var(--ease);
 }
 .is-revealed .status,
-.is-revealed .fallback-nav { opacity: 1; transform: none; }
+.is-revealed .fallback-nav,
+.is-revealed .site-head { opacity: 1; transform: none; }
 
 /* モーション抑制設定では演出を出さずに即表示する */
 @media (prefers-reduced-motion: reduce) {
   .intro-veil { display: none; }
-  .stage, .status, .fallback-nav { opacity: 1; transform: none; }
+  .stage, .status, .fallback-nav, .site-head { opacity: 1; transform: none; }
   .star.is-twinkle::before, .star.is-twinkle::after { animation: none; }
   .grow__card { transition: none; }
 }

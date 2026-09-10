@@ -161,6 +161,45 @@ test('ドラッグの終わりを window でも受けている（取りこぼす
     'src/js/stars.js が pointercancel を window で受けていない');
 });
 
+test('カテゴリの文言をメニューに書き写していない（data.js から作る）', () => {
+  // 増減のたびに 2 か所直すことになり、必ず片方が古くなる
+  const label = loadBrowserScripts('src/js/data.js').HIDD_DATA.categories[0].label;
+  for (const f of ['src/index.html', 'src/js/menu.js']) {
+    assert.ok(!read(f).includes(label), `${f} にカテゴリ名が直書きされている: ${label}`);
+  }
+  assert.ok(/DATA\.categories/.test(read('src/js/menu.js')),
+    'src/js/menu.js が data.js の categories を読んでいない');
+});
+
+test('メニューの開閉を rAF や hidden 属性のタイマーに紐づけていない', () => {
+  // rAF はタブ非表示だと止まり、setTimeout も間引かれる。
+  // 開閉は class の付け外しだけにして、遅れても状態が食い違わないようにする。
+  const code = read('src/js/menu.js');
+  assert.ok(!/requestAnimationFrame/.test(code),
+    'src/js/menu.js が rAF を使っている（タブ非表示で開閉が止まる）');
+  assert.ok(!/\.hidden\s*=/.test(code),
+    'src/js/menu.js が hidden 属性を切り替えている（transition と競合する。visibility で隠すこと）');
+});
+
+test('メニューを開いているあいだは無操作と判定しない', () => {
+  const body = read('src/js/stars.js').match(/function armIdle\(\)\s*\{([\s\S]*?)\n  \}/);
+  assert.ok(body, 'src/js/stars.js に armIdle が無い');
+  assert.ok(/HIDDMenu/.test(body[1]),
+    'armIdle がメニューの開閉を見ていない。メニューを見ている最中に自動再生が始まる');
+});
+
+test('WebGL 非対応時のカテゴリ一覧が残っている', () => {
+  // 球体の下の一覧は左上のメニューへ移したが、3D が使えない環境では
+  // これが唯一の導線になる。display: none にしたまま復帰させ忘れないこと。
+  const css = read('src/css/index.css');
+  assert.ok(/\.fallback-nav\s*\{[^}]*display:\s*none/.test(css),
+    '球体の下のカテゴリ一覧が隠されていない');
+  assert.ok(/\.no-webgl\s+\.fallback-nav\s*\{[^}]*display:\s*block/.test(css),
+    'WebGL 非対応時に .fallback-nav が出てこない（カテゴリへ行けなくなる）');
+  assert.ok(read('src/index.html').includes('id="fallbackList"'),
+    'src/index.html からフォールバックの一覧が消えている');
+});
+
 /* --- 動画まわり --- */
 
 test('実物の動画を Git に入れない設定になっている', () => {

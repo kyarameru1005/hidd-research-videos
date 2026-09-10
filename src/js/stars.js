@@ -742,6 +742,9 @@
   function armIdle() {
     if (reduceMotion) return;
     if (dragging || pinchPointers.size >= 2) return;
+    /* 左上のメニューを開いている間も操作中。
+       開いたままの放置は menu.js 側が閉じて、ここへ戻してくれる */
+    if (window.HIDDMenu && window.HIDDMenu.isOpen()) return;
     var wait = IDLE_MS + spinSettleMs(velYaw, velPitch, SETTLE_RAD_PER_SEC, FRICTION);
     idleTimer = setTimeout(function () {
       idleTimer = null;
@@ -882,6 +885,7 @@
       noteActivity();      /* ここから無操作時間の計測を始める */
       requestRender();
     },
-    render: requestRender
+    render: requestRender,
+    noteActivity: noteActivity   /* 球体の外（menu.js）からも操作を知らせる */
   };
 })();

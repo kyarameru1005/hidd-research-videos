@@ -17,6 +17,27 @@
   <div class="intro-spark"></div>
 </div>
 
+<!-- 画面左上の見出し。メニューからカテゴリへ直接移動できる
+     （以前は球体の下にカテゴリを並べていた。ナビはここに一本化した） -->
+<header class="site-head" id="siteHead">
+  <button class="menu-btn" type="button" id="menuBtn"
+          aria-expanded="false" aria-controls="menuPanel" aria-label="カテゴリメニューを開く">
+    <span class="menu-btn__bar" aria-hidden="true"></span>
+    <span class="menu-btn__bar" aria-hidden="true"></span>
+    <span class="menu-btn__bar" aria-hidden="true"></span>
+  </button>
+
+  <!-- img/HIDD.png（黒地に白抜き）の黒を透過にしたもの。生成の手順は docs/decisions.md -->
+  <img class="site-head__logo" src="img/HIDD-mark.png" width="1184" height="240"
+       alt="HIDD 高度ICTデザイン学科">
+
+  <!-- 項目は js/menu.js が data.js の categories から作る（文言をここに書かない） -->
+  <nav class="menu-panel" id="menuPanel" aria-label="カテゴリ">
+    <p class="menu-panel__title">カテゴリから選ぶ</p>
+    <ul class="menu-panel__list" id="menuList"></ul>
+  </nav>
+</header>
+
 <main class="stage" id="stage">
 
   <h1 class="visually-hidden">HIDD 先行研究 紹介動画</h1>
@@ -55,7 +76,8 @@
 
   <p class="status" id="status"></p>
 
-  <!-- WebGL 非対応時のフォールバック兼、キーボード・支援技術向けの正規リンク -->
+  <!-- WebGL 非対応時のフォールバック。
+       3D が動く環境では左上のメニューが導線なので、CSS で隠している -->
   <nav class="fallback-nav" id="fallbackNav" aria-label="カテゴリ">
     <p class="fallback-nav__title">カテゴリから選ぶ</p>
     <ul class="fallback-nav__list" id="fallbackList"></ul>
@@ -69,6 +91,7 @@
 <script src="js/geometry.js"></script>
 <script src="js/texture-lab.js"></script>
 <script src="js/stars.js"></script>
+<script src="js/menu.js"></script>
 <script src="js/intro.js"></script>
 </body>
 </html>
