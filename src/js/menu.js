@@ -47,10 +47,22 @@
 
   /* ---------------- 開閉 ---------------- */
 
-  /** 球体側（stars.js）に操作があったことを伝える。WebGL 非対応時は無い */
+  /** 人が触ったことを球体側（stars.js）に伝える。WebGL 非対応時は無い */
   function noteActivity() {
     var sphere = window.HIDDSphere;
     if (sphere && sphere.noteActivity) sphere.noteActivity();
+  }
+
+  /**
+   * 無操作の計測だけ再開させる。
+   *
+   * 放置で自動的に閉じるときに noteActivity を呼ぶと、
+   * 再生中の動画まで閉じてしまう（noteActivity は「人が操作を取り戻した」の合図）。
+   * メニューを開いたまま星を押した場合に実際に起きる。
+   */
+  function resumeIdle() {
+    var sphere = window.HIDDSphere;
+    if (sphere && sphere.armIdle) sphere.armIdle();
   }
 
   /** 開いたまま放置されたときの後始末。触られるたびに測り直す */
@@ -60,6 +72,7 @@
     autoClose = setTimeout(function () {
       autoClose = null;
       setOpen(false);
+      resumeIdle();
     }, MENU_IDLE_MS);
   }
 
@@ -71,10 +84,15 @@
     btn.setAttribute('aria-expanded', open ? 'true' : 'false');
     btn.setAttribute('aria-label', open ? 'カテゴリメニューを閉じる' : 'カテゴリメニューを開く');
     armAutoClose();
-    noteActivity();    /* 開閉そのものが操作。無操作の計測をやり直す */
   }
 
-  btn.addEventListener('click', function () { setOpen(!open); });
+  /** 人が開け閉めしたとき。操作なので無操作の計測をやり直す */
+  function toggleByUser(next) {
+    setOpen(next);
+    noteActivity();
+  }
+
+  btn.addEventListener('click', function () { toggleByUser(!open); });
 
   /* メニューの中を触っているあいだは閉じない */
   head.addEventListener('pointerdown', armAutoClose);
@@ -84,18 +102,18 @@
   /* 外側を押したら閉じる。球体の操作を邪魔しないよう、閉じるだけで何も飲み込まない */
   document.addEventListener('pointerdown', function (e) {
     if (!open || head.contains(e.target)) return;
-    setOpen(false);
+    toggleByUser(false);
   });
 
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape' || !open) return;
-    setOpen(false);
+    toggleByUser(false);
     btn.focus();
   });
 
   /* stars.js が「操作中かどうか」を見る */
   window.HIDDMenu = {
     isOpen: function () { return open; },
-    close: function () { setOpen(false); }
+    close: function () { toggleByUser(false); }
   };
 })();

@@ -200,6 +200,17 @@ test('WebGL 非対応時のカテゴリ一覧が残っている', () => {
     'src/index.html からフォールバックの一覧が消えている');
 });
 
+test('全画面の再生カードを .stage の中に置いていない', () => {
+  // .stage は z-index: 1 のスタッキングコンテキスト。この中に入れると、
+  // .grow の z-index をいくつ上げても body 直下の .site-head（左上の見出し）より
+  // 上に出せず、再生中の動画にロゴが重なる。
+  const html = read('src/index.html');
+  const stage = html.slice(html.indexOf('<main'), html.indexOf('</main>'));
+  assert.ok(!stage.includes('id="grow"'),
+    'src/index.html の再生カードが <main class="stage"> の中にある。body 直下へ出すこと');
+  assert.ok(html.includes('id="grow"'), 'src/index.html から再生カードが消えている');
+});
+
 /* --- 動画まわり --- */
 
 test('実物の動画を Git に入れない設定になっている', () => {

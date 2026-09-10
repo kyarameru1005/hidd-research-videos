@@ -172,9 +172,11 @@
    カテゴリ名・タイトル・発表者は動画の上に重ねる。行として置くと、
    その分だけ確実に動画が小さくなるため。
 
-   .sphere-wrap（max-width 1180px / overflow: hidden）の中にあるので、
-   absolute のままだと球体の枠に閉じ込められる。fixed で表示領域まで広げる。
-   下のカテゴリナビは隠れてよい、という判断。 */
+   以前は .sphere-wrap（max-width 1180px / overflow: hidden）の中にあり、
+   absolute のままだと球体の枠に閉じ込められるため fixed にしていた。
+   さらに .stage（z-index: 1）の中では重なり順がそこで閉じてしまい、
+   z-index をいくつにしても body 直下の .site-head（左上の見出し）より上に出せない。
+   要素そのものを body 直下へ出し、根っこの重なり順で最前面に置いている。 */
 .grow {
   position: fixed;
   inset: 0;

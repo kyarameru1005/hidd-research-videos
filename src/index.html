@@ -55,23 +55,6 @@
     <div class="overlay" id="overlay" aria-hidden="true">
       <div class="brand" data-anchor="brand">高度ICTデザイン学科<br>研究成果動画</div>
     </div>
-
-    <!-- 星から生えてくる再生カード -->
-    <div class="grow" id="grow" hidden>
-      <div class="grow__card" id="growCard">
-        <!-- 動画が先。文字は上に重ねる（行として置くと、その分だけ動画が小さくなる） -->
-        <div class="grow__player" id="growPlayer"></div>
-        <div class="grow__info">
-          <div class="grow__head">
-            <span class="grow__lab" id="growLab"></span>
-            <button class="grow__close" type="button" id="growClose" aria-label="閉じる">&times;</button>
-          </div>
-          <h2 class="grow__title" id="growTitle"></h2>
-          <p class="grow__summary" id="growSummary"></p>
-        </div>
-        <div class="grow__bar"><span id="growProgress"></span></div>
-      </div>
-    </div>
   </div>
 
   <p class="status" id="status"></p>
@@ -84,6 +67,26 @@
   </nav>
 
 </main>
+
+<!-- 星から生えてくる再生カード。
+     表示領域いっぱいに広がるので body 直下に置く。
+     .stage（z-index: 1）の中に入れると重なり順がそこで閉じてしまい、
+     左上の見出し（.site-head）より上に出せない。 -->
+<div class="grow" id="grow" hidden>
+  <div class="grow__card" id="growCard">
+    <!-- 動画が先。文字は上に重ねる（行として置くと、その分だけ動画が小さくなる） -->
+    <div class="grow__player" id="growPlayer"></div>
+    <div class="grow__info">
+      <div class="grow__head">
+        <span class="grow__lab" id="growLab"></span>
+        <button class="grow__close" type="button" id="growClose" aria-label="閉じる">&times;</button>
+      </div>
+      <h2 class="grow__title" id="growTitle"></h2>
+      <p class="grow__summary" id="growSummary"></p>
+    </div>
+    <div class="grow__bar"><span id="growProgress"></span></div>
+  </div>
+</div>
 
 <script src="vendor/three.min.js"></script>
 <script src="js/videos.js"></script>
