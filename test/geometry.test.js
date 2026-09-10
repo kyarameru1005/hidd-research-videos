@@ -131,3 +131,31 @@ test('任意の向きでも正面に回せる（総当たり）', () => {
 test('Node には WebGL が無いので hasWebGL は false（例外を投げない）', () => {
   assert.equal(G.hasWebGL(), false);
 });
+
+/* --- 惰性が落ち着くまでの時間（無操作の判定に使う） --- */
+
+test('spinSettleMs: 指定の速さまで落ちる時間が減衰の式と一致する', () => {
+  const friction = 0.84;   // src/js/stars.js の FRICTION
+  const settle = 0.35;     // 巡回と同じ速さ
+  for (const v of [0.4, 1, 3, 6]) {
+    const ms = G.spinSettleMs(v, 0, settle, friction);
+    assert.ok(ms > 0, `${v} rad/s で 0 になった`);
+    // t 秒後の速さが settle ちょうどになること
+    const left = v * Math.pow(friction, ms / 1000);
+    assert.ok(Math.abs(left - settle) < 1e-9, `${v} rad/s: ${left} != ${settle}`);
+  }
+});
+
+test('spinSettleMs: 速い方の軸で決まり、速いほど長くかかる', () => {
+  assert.equal(G.spinSettleMs(1, 4, 0.35, 0.84), G.spinSettleMs(4, 1, 0.35, 0.84));
+  assert.ok(G.spinSettleMs(6, 0, 0.35, 0.84) > G.spinSettleMs(2, 0, 0.35, 0.84));
+  assert.equal(G.spinSettleMs(-4, 0, 0.35, 0.84), G.spinSettleMs(4, 0, 0.35, 0.84));
+});
+
+test('spinSettleMs: 止まっている・値が不正なら 0（待たせ続けない）', () => {
+  assert.equal(G.spinSettleMs(0, 0, 0.35, 0.84), 0);
+  assert.equal(G.spinSettleMs(0.35, 0.1, 0.35, 0.84), 0);
+  assert.equal(G.spinSettleMs(5, 0, 0, 0.84), 0);
+  assert.equal(G.spinSettleMs(5, 0, 0.35, 1), 0);      // 減らない → 無限になる
+  assert.equal(G.spinSettleMs(5, 0, 0.35, 0), 0);
+});
