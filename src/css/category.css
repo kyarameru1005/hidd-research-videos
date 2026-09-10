@@ -335,7 +335,7 @@
 
 .modal__panel {
   position: relative;
-  width: min(960px, 100%);
+  width: min(1440px, 100%);
   max-height: calc(100vh - 48px);
   overflow: auto;
   background: var(--bg-soft);
