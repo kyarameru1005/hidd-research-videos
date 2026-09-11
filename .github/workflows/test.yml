@@ -1,0 +1,38 @@
+# テスト（node --test test/*.test.js）を push と PR のたびに回す。
+# npm は使わない（package.json も無い）。Node 標準のテストランナーだけで動き、
+# serve.py の検査に python3、ブラウザの検査に Chrome を使う（どちらもランナーに入っている）。
+# CI では環境変数 CI が立つので、python3 や Chrome が見つからなければ飛ばさずに落ちる。
+name: テスト
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: 使うツールの版
+        run: |
+          node --version
+          python3 --version
+          google-chrome --version
+
+      - name: テスト
+        run: node --test test/*.test.js
