@@ -47,6 +47,38 @@ test('HTML が参照するファイルが全て存在する', () => {
   assert.deepEqual(missing, [], '参照切れ');
 });
 
+test('本番のページは src/ の外を参照していない（src/ だけ配っても動く）', () => {
+  const out = [];
+  const outside = (from, ref) => {
+    if (/^(https?:)?\/\//.test(ref) || /^(#|data:|mailto:)/.test(ref)) return;
+    const target = path.join(path.dirname(repoPath(from)), ref.split(/[?#]/)[0]);
+    if (path.relative(repoPath('src'), target).startsWith('..')) out.push(`${from} -> ${ref}`);
+  };
+  for (const f of HTML.filter((x) => x.startsWith('src/'))) {
+    for (const m of read(f).matchAll(/(?:src|href)="([^"]+)"/g)) outside(f, m[1]);
+  }
+  for (const f of CSS.filter((x) => x.startsWith('src/'))) {
+    for (const m of read(f).matchAll(/url\(\s*["']?([^"')]+)/g)) outside(f, m[1]);
+  }
+  assert.deepEqual(out, [], 'src/ の外（demo/ など）を参照している');
+});
+
+test('JS が id で引く要素が、そのスクリプトを読むページにある', () => {
+  // HTML の id を変えて JS を直し忘れると、読み込み時に null で落ちて球体もカテゴリも出ない
+  const missing = [];
+  for (const html of HTML.filter((f) => f.startsWith('src/'))) {
+    const page = read(html);
+    const ids = new Set([...page.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
+    for (const s of page.matchAll(/<script src="(js\/[^"]+)"/g)) {
+      const js = path.join(path.dirname(html), s[1]);
+      for (const g of read(js).matchAll(/getElementById\(\s*'([^']+)'\s*\)/g)) {
+        if (!ids.has(g[1])) missing.push(`${js} が引く #${g[1]} が ${html} に無い`);
+      }
+    }
+  }
+  assert.deepEqual(missing, []);
+});
+
 test('type="module" を使っていない（file:// で読めなくなる）', () => {
   for (const html of HTML) {
     assert.ok(!/type\s*=\s*["']module["']/.test(read(html)), `${html} に type="module"`);
@@ -294,6 +326,26 @@ test('実物の動画を Git に入れない設定になっている', () => {
   assert.ok(/^!src\/videos\/sample\/\*$/m.test(ignore), 'sample が除外解除されていない');
   assert.ok(/^!src\/videos\/\*\/\.gitkeep$/m.test(ignore),
     '.gitkeep が除外解除されていない。空のカテゴリフォルダが clone 先に残らなくなる');
+});
+
+/** Git が追跡しているファイル。Git の外（zip で配ったものなど）では null */
+const TRACKED = (() => {
+  try {
+    return execFileSync('git', ['ls-files', '-z'], { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+      .split('\0').filter(Boolean);
+  } catch {
+    return null;
+  }
+})();
+
+test('Git に動画の実物や大きなファイルを入れていない', { skip: !TRACKED && 'Git の管理下ではない' }, () => {
+  // .gitignore は git add -f や大文字の拡張子（Linux の .MOV）、想定外の置き場所をすり抜ける。
+  // GitHub は 1 ファイル 100MB が上限で、一度履歴に入ると消すのに履歴の書き換えが要る
+  const media = TRACKED.filter((f) =>
+    /\.(mp4|m4v|mov|webm|ogv|ogg|avi|wmv|mkv)$/i.test(f) && !f.startsWith('src/videos/sample/'));
+  assert.deepEqual(media, [], '動画の実物が Git に入っている（配布は USB や共有ドライブで行う）');
+  const big = TRACKED.filter((f) => existsSync(repoPath(f)) && statSync(repoPath(f)).size > 2 * 1024 * 1024);
+  assert.deepEqual(big, [], '2MB を超えるファイルが Git に入っている');
 });
 
 test('カテゴリごとの動画フォルダが用意されている', () => {
