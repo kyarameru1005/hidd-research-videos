@@ -159,3 +159,81 @@ test('spinSettleMs: 止まっている・値が不正なら 0（待たせ続け�
   assert.equal(G.spinSettleMs(5, 0, 0.35, 1), 0);      // 減らない → 無限になる
   assert.equal(G.spinSettleMs(5, 0, 0.35, 0), 0);
 });
+
+/* --- カテゴリページのフィルムストリップ（循環） --- */
+
+// src/css/category.css の寸法を画面幅 vw に当てはめる。
+// コマ幅 clamp(240px, 30vw, 320px)、間隔 16px、左右の余白 clamp(20px, 6vw, 56px)、
+// 表示幅は .cat-main の max-width 1080px まで
+function stripCase(vw, n) {
+  const pad = Math.min(Math.max(20, vw * 0.06), 56);
+  const card = Math.min(Math.max(240, vw * 0.3), 320);
+  const gap = 16;
+  return { viewW: Math.min(vw, 1080), pad, gap, setW: (card + gap) * n };
+}
+
+test('stripCopies: 画面に収まる本数なら循環させない（今までどおり並べるだけ）', () => {
+  const c = stripCase(1280, 2);
+  assert.equal(G.stripCopies(c.viewW, c.setW, c.pad * 2, c.gap), null);
+  assert.equal(G.stripCopies(1080, 0, 112, 16), null);    // 動画なし
+  assert.equal(G.stripCopies(0, 1000, 112, 16), null);    // 非表示（幅 0）
+});
+
+test('stripCopies: 流している間も、手で 1 周ぶん送っても、端の余白が見えない', () => {
+  for (const vw of [320, 375, 600, 800, 1080, 1280, 1920]) {
+    for (let n = 1; n <= 12; n++) {
+      const c = stripCase(vw, n);
+      const label = `${vw}px ${n} 本`;
+      const plan = G.stripCopies(c.viewW, c.setW, c.pad * 2, c.gap);
+      if (!plan) {
+        assert.ok(c.pad * 2 + c.setW - c.gap <= c.viewW + 4, `${label}: はみ出すのに循環しない`);
+        continue;
+      }
+      // scrollLeft = s で見えるのは [s, s + viewW]。コマは [pad, lastCard] に並ぶ
+      const sets = plan.before + 1 + plan.after;
+      const lastCard = c.pad + sets * c.setW - c.gap;
+      const maxScroll = c.pad * 2 + sets * c.setW - c.gap - c.viewW;
+      const home = plan.before * c.setW;   // 基準の 1 周の先頭コマを左の余白の位置に置く
+      assert.ok(home >= c.pad, `${label}: 左端の余白が見える`);
+      assert.ok(home + c.setW + c.viewW <= lastCard + 1e-9, `${label}: 流れの途中で右端の余白が見える`);
+      assert.ok(home >= c.setW, `${label}: 左へ 1 周送る余裕が無い`);
+      assert.ok(maxScroll - (home + c.setW) >= c.setW - 1e-9, `${label}: 右へ 1 周送る余裕が無い`);
+    }
+  }
+});
+
+test('wrapStrip: 何周ずれていても基準の 1 周の中へ戻す', () => {
+  const home = 1008, setW = 2352;
+  for (let k = -3; k <= 3; k++) {
+    for (const d of [0, 1, 500.5, setW - 1]) {
+      const got = G.wrapStrip(home + d + k * setW, home, setW);
+      assert.ok(Math.abs(got - (home + d)) < 1e-6, `k=${k} d=${d}: ${got}`);
+      assert.ok(got >= home && got < home + setW, `範囲外: ${got}`);
+    }
+  }
+});
+
+test('stripStepTarget: 揃った位置からはちょうど 1 コマ送る', () => {
+  const home = 1008, step = 336;
+  for (let k = -2; k <= 8; k++) {
+    const p = home + k * step;
+    assert.equal(G.stripStepTarget(p, home, step, 1), p + step);
+    assert.equal(G.stripStepTarget(p, home, step, -1), p - step);
+  }
+});
+
+test('stripStepTarget: 流れの途中で止まった位置からは、次（前）のコマの頭へ揃える', () => {
+  const home = 1008, step = 336;
+  const p = home + 2.5 * step;
+  assert.equal(G.stripStepTarget(p, home, step, 1), home + 3 * step);
+  assert.equal(G.stripStepTarget(p, home, step, -1), home + 2 * step);
+});
+
+test('stripStepTarget: 丸め誤差で同じコマへ 1px だけ動いて終わらない', () => {
+  const home = 1008, step = 336;
+  const at = home + 3 * step;
+  for (const e of [-1, -0.5, 0.5, 1]) {
+    assert.equal(G.stripStepTarget(at + e, home, step, 1), at + step, `+${e}px から次へ`);
+    assert.equal(G.stripStepTarget(at + e, home, step, -1), at - step, `+${e}px から前へ`);
+  }
+});

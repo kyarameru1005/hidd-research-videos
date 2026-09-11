@@ -115,6 +115,10 @@
   scrollbar-width: thin;
 }
 
+/* 循環中（js/category.js が .is-loop を付ける）はスナップを外す。
+   mandatory のままだと、流すたびに最寄りのコマの頭へ引き戻されて進まない */
+.strip__track.is-loop { scroll-snap-type: none; }
+
 /* ---------- フィルムのコマ（1 本 = 1 パネル） ---------- */
 
 .film {
