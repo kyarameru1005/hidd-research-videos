@@ -11,7 +11,10 @@
  *   - 進行に関わる処理は setTimeout で出す（rAF はタブ非表示だと止まるため）
  *   - 再生が進まなくなったら次へ送る（1 本読めないだけで止まらないように）
  *   - 音は最初から出す。ブラウザに止められたらミュートで再生を続け、
- *     一度でも操作があればそこで音を戻す（docs/operations.md を参照）
+ *     一度でも操作があればそこで音を戻す（docs/operations.md を参照）。
+ *     設定画面（js/settings.js）で「なし」にすると、最初から無音で流す
+ *   - 放置の秒数・再生時間・音量・球体の見た目なども設定画面で変えられる
+ *     （ここに書いた定数は既定値）
  */
 (function () {
   'use strict';
@@ -32,7 +35,10 @@
 
   var STORE = 'hidd.pos.';        /* 再生位置の保存キー */
 
-  /* ---------------- 展示の設定（固定値） ---------------- */
+  /* ---------------- 展示の設定 ----------------
+     ここに書いた値は既定値。設定画面（js/settings.js、Ctrl + Shift + S）で
+     変えた値があればそちらを使う（setting() で読み、変わったら音声の節の onChange で当て直す）。
+     既定値は settings.js の def と揃えること（test/settings.test.js が突き合わせている）。 */
 
   var IDLE_MS = 5000;             /* 操作が止まってから球体が回り出すまで */
   var PLAY_MS = 5000;             /* 回り出してから動画を再生するまで */
@@ -44,14 +50,25 @@
      そこから無操作の時間を数え始める（巡回と同じ速さを基準にしている）。 */
   var SETTLE_RAD_PER_SEC = TOUR_RAD_PER_SEC;
 
-  /* 手を離したあとの減衰。1 に近いほど長く回り続ける。
-     0.84 は半減期およそ 4 秒（demo/inertia.html の「重い（弾み車）」）。 */
-  var FRICTION = 0.84;
+  var SETTINGS = window.HIDDSettings || null;
 
-  /* ズーム（カメラを球の中心へ寄せる・引く）の範囲 */
+  /** 設定画面の値を数として読む。settings.js が無い・数でなければ fallback */
+  function setting(key, fallback) {
+    var v = SETTINGS ? parseFloat(SETTINGS.get(key)) : NaN;
+    return isFinite(v) ? v : fallback;
+  }
+
+  /* 手を離したあとの減衰。1 に近いほど長く回り続ける。
+     既定の 0.84 は半減期およそ 4 秒（demo/inertia.html の「重い（弾み車）」）。 */
+  var FRICTION_DEFAULT = 0.84;
+  var FRICTION = setting('inertia', FRICTION_DEFAULT);
+
+  /* ズーム（カメラを球の中心へ寄せる・引く）の範囲。
+     camHome は巡回に戻るときの距離で、設定画面の「大きさ」で変わる */
   var CAM_DEFAULT = 3.6;
   var CAM_MIN = 1.75;
   var CAM_MAX = 7.0;
+  var camHome = setting('zoom', CAM_DEFAULT);
 
   var reduceMotion = window.matchMedia &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -165,7 +182,7 @@
 
   var scene = new THREE.Scene();
   var camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-  var camZ = CAM_DEFAULT;
+  var camZ = camHome;
   camera.position.set(0, 0, camZ);
 
   var renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
@@ -276,7 +293,9 @@
   var current = null;            /* 再生中のエントリ */
   var watchdog = null;           /* 再生が進まないときに次へ送る番人 */
   var openTimer = null;          /* カードを開く合図（is-open を付ける）のタイマー */
+  var limitTimer = null;         /* 1 本あたりの再生時間（設定画面）の区切り */
   var bag = null;                /* 未再生の動画（シャッフル済み）。null は未初期化 */
+  var showLines = true;          /* 星座線を描くか（設定画面。applyLook が決める） */
 
   var intro = null;
   var introScale = reduceMotion ? 1 : 0.001;
@@ -346,7 +365,8 @@
       }
     }
 
-    for (var k = 0; k < LINES.length; k++) {
+    /* 星座線を消しているときは座標も書かない（毎フレームの無駄を省く） */
+    for (var k = 0; showLines && k < LINES.length; k++) {
       var L = LINES[k];
       var pa = L.from, pb = L.to.anchor;
       if (!pa || !pb) continue;
@@ -510,7 +530,8 @@
     } catch (e) { return 0; }
   }
 
-  function pickAndPlay(entry) {
+  /** auto は放置による自動再生のとき true（1 本あたりの再生時間で区切る） */
+  function pickAndPlay(entry, auto) {
     markPlayed(entry);
     current = entry;
     ENTRIES.forEach(function (x) { x.el.classList.toggle('is-picked', x === entry); });
@@ -520,11 +541,11 @@
     snapTo(entry.dir);
     setPhase('playing');
     setTimeout(function () {
-      if (phase === 'playing' && current === entry) openCard(entry);
+      if (phase === 'playing' && current === entry) openCard(entry, auto);
     }, SNAP_MS + 40);
   }
 
-  function openCard(entry) {
+  function openCard(entry, auto) {
     grow.style.setProperty('--cat', entry.cat.accent);
     growLab.textContent = entry.cat.label;
     growTitle.textContent = entry.video.title;
@@ -546,20 +567,21 @@
     }, 20);
 
     if (entry.file) {
-      playLocal(entry);
+      playLocal(entry, auto);
     } else {
       playMissing(entry);
     }
   }
 
   /** ローカル動画。自動再生・終了検知・再生位置の復元ができる */
-  function playLocal(entry) {
+  function playLocal(entry, auto) {
     var v = document.createElement('video');
     v.src = entry.file;
     v.playsInline = true;
     v.preload = 'metadata';
     v.controls = true;
-    v.muted = false;              /* まず音ありで試す */
+    v.muted = !soundOn();         /* まず音ありで試す（設定で「なし」なら最初から無音） */
+    v.volume = setting('volume', 1);
     growPlayer.appendChild(v);
 
     var resumeAt = savedPos(entry);
@@ -587,6 +609,17 @@
     });
 
     startWatchdog(function () { return v.currentTime; });
+
+    /* 放置による自動再生のときだけ、1 本あたりの再生時間で区切る（設定画面）。
+       星を押して選んだ動画は最後まで流す。区切った動画は再生位置が残るので、
+       次に回ってきたときに続きから流れる。進行なので rAF ではなく setTimeout で出す */
+    var limit = auto ? setting('limit', 0) : 0;
+    if (limit > 0) {
+      limitTimer = setTimeout(function () {
+        limitTimer = null;
+        if (phase === 'playing' && current === entry) autoNext();
+      }, limit * 1000);
+    }
 
     var p = v.play();
     if (p && p.catch) {
@@ -647,6 +680,7 @@
 
   function closeCard() {
     stopWatchdog();
+    if (limitTimer) { clearTimeout(limitTimer); limitTimer = null; }
     /* 開く合図がまだ発火していないなら取り消す。
        これを消さないと、閉じた直後に遅れて is-open が付き、
        下の後始末が「まだ開いている」と判断してカードが閉じないまま残る。
@@ -665,7 +699,7 @@
 
   function autoNext() {
     closeCard();
-    setTimeout(function () { if (phase === 'playing') pickAndPlay(nextEntry()); }, 380);
+    setTimeout(function () { if (phase === 'playing') pickAndPlay(nextEntry(), true); }, 380);
   }
 
   /* ---------------- 音声のロック解除 ----------------
@@ -678,7 +712,7 @@
      起動する必要がある。手順は docs/operations.md に書いてある。 */
   function unlockSound() {
     var v = growPlayer.querySelector('video');
-    if (v && v.muted) {
+    if (v && v.muted && soundOn()) {
       v.muted = false;
       var p = v.play();
       if (p && p.catch) p.catch(function () {});
@@ -686,6 +720,35 @@
   }
   document.addEventListener('pointerdown', unlockSound, { once: true });
   document.addEventListener('keydown', unlockSound, { once: true });
+
+  /** 設定画面の「動画の音」。settings.js を読んでいなければ音ありのまま */
+  function soundOn() {
+    return !SETTINGS || SETTINGS.get('sound') !== 'off';
+  }
+
+  /* 見た目の設定（星座線・星のまたたき・画面下の操作ヒント）を当てる。読み込み時と変わったとき */
+  function applyLook() {
+    showLines = !SETTINGS || SETTINGS.get('lines') !== 'off';
+    svg.classList.toggle('is-off', !showLines);
+    overlay.classList.toggle('is-still', !!SETTINGS && SETTINGS.get('twinkle') === 'off');
+    if (statusEl) statusEl.classList.toggle('is-off', !!SETTINGS && SETTINGS.get('hint') === 'off');
+    requestRender();
+  }
+
+  /* 設定が変わったら、その場で効かせる。再生中の動画の音・音量も切り替える
+     （設定画面のボタンを押す操作が入るので、音を戻しても自動再生の制限には掛からない想定）。
+     放置の秒数・再生までの秒数・再生時間・自動再生のする／しないは、使うときに読むので何もしない */
+  if (SETTINGS) {
+    SETTINGS.onChange(function (key, value) {
+      var v = growPlayer.querySelector('video');
+      if (key === 'inertia') FRICTION = parseFloat(value);
+      else if (key === 'zoom') { camHome = parseFloat(value); setZoom(camHome); }
+      else if (key === 'sound') { if (v) v.muted = !soundOn(); }
+      else if (key === 'volume') { if (v) v.volume = setting('volume', 1); }
+      else if (key === 'lines' || key === 'twinkle' || key === 'hint') applyLook();
+      else if (key === 'resetPos') bag = null;   /* 再生の順番も最初から作り直す */
+    });
+  }
 
   /* ---------------- 放置の状態遷移 ---------------- */
 
@@ -749,13 +812,17 @@
     /* 左上のメニューを開いている間も操作中。
        開いたままの放置は menu.js 側が閉じて、ここへ戻してくれる */
     if (window.HIDDMenu && window.HIDDMenu.isOpen()) return;
-    var wait = IDLE_MS + spinSettleMs(velYaw, velPitch, SETTLE_RAD_PER_SEC, FRICTION);
+    /* 設定画面を開いている間も操作中。放置は settings.js 側が閉じてここへ戻す */
+    if (SETTINGS && SETTINGS.isOpen()) return;
+    /* 設定画面で自動再生を「しない」にしているときは数えない（人が操作する発表向け） */
+    if (SETTINGS && SETTINGS.get('auto') === 'off') return;
+    var wait = setting('idle', IDLE_MS) + spinSettleMs(velYaw, velPitch, SETTLE_RAD_PER_SEC, FRICTION);
     idleTimer = setTimeout(function () {
       idleTimer = null;
       if (document.hidden) return;
       /* 無人展示では、来場者が寄せたままの倍率で放置されると
          そのあとずっと寄ったままになる。巡回に戻るときに既定へ戻す。 */
-      setZoom(CAM_DEFAULT);
+      setZoom(camHome);
       setPhase('tour');
       tourStep = 0;
       beginTourLeg();
@@ -763,8 +830,8 @@
       playTimer = setTimeout(function () {
         playTimer = null;
         if (document.hidden) return;
-        pickAndPlay(nextEntry());
-      }, PLAY_MS);
+        pickAndPlay(nextEntry(), true);
+      }, setting('delay', PLAY_MS));
     }, wait);
   }
 
@@ -874,6 +941,7 @@
     else { noteActivity(); requestRender(); }
   });
 
+  applyLook();
   resize();
   drawFrame();
   updateStatus();

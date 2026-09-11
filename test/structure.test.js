@@ -132,6 +132,28 @@ test('横送りの状態更新を scroll イベントだけに任せていない
     'scroll イベントはタブ非表示だと来ないので、ボタンが押せなくなる');
 });
 
+test('フィルムストリップの流れの再開を setTimeout で出している', () => {
+  // 手で送ったあとの再開を scroll イベントや rAF の完了に紐づけると、
+  // タブが隠れている間は合図が届かず、止まったままになる
+  const body = read('src/js/category.js').match(/function nudge\(\)\s*\{([\s\S]*?)\n  \}/);
+  assert.ok(body, 'src/js/category.js に nudge が無い（手で動かしたときの一時停止は 1 か所にまとめる）');
+  assert.ok(/setTimeout\(/.test(body[1]), 'nudge が流れの再開を setTimeout で予約していない');
+});
+
+test('循環中はスクロールスナップを外している', () => {
+  // mandatory のままだと、流すたびに最寄りのコマの頭へ引き戻されて進まない
+  assert.ok(/\.strip__track\.is-loop\s*\{[^}]*scroll-snap-type:\s*none/.test(read('src/css/category.css')),
+    'src/css/category.css の .strip__track.is-loop が scroll-snap-type: none になっていない');
+});
+
+test('循環用に複製したコマを Tab と読み上げから外している', () => {
+  // 外さないと、同じ動画が何度も Tab でたどられ、読み上げられる
+  const body = read('src/js/category.js').match(/function makePanel\([^)]*\)\s*\{([\s\S]*?)\n  \}/);
+  assert.ok(body, 'src/js/category.js に makePanel が無い（本物と複製は同じ関数で作る）');
+  assert.ok(/tabIndex\s*=\s*-1/.test(body[1]) && /aria-hidden/.test(body[1]),
+    '複製のコマに tabIndex = -1 と aria-hidden が付いていない');
+});
+
 test('回転の計算が 1 か所にまとまっている（重複させない）', () => {
   for (const f of ['src/js/stars.js', 'demo/js/stars.js']) {
     assert.ok(!/^\s*function facingAngles/m.test(read(f)),
@@ -186,6 +208,47 @@ test('メニューを開いているあいだは無操作と判定しない', ()
   assert.ok(body, 'src/js/stars.js に armIdle が無い');
   assert.ok(/HIDDMenu/.test(body[1]),
     'armIdle がメニューの開閉を見ていない。メニューを見ている最中に自動再生が始まる');
+});
+
+test('設定画面を開いているあいだは無操作と判定しない', () => {
+  const body = read('src/js/stars.js').match(/function armIdle\(\)\s*\{([\s\S]*?)\n  \}/);
+  assert.ok(body, 'src/js/stars.js に armIdle が無い');
+  assert.ok(/SETTINGS\.isOpen\(\)/.test(body[1]),
+    'armIdle が設定画面の開閉を見ていない。設定している最中に自動再生が始まる');
+});
+
+test('設定画面の開閉を rAF や hidden 属性のタイマーに紐づけていない', () => {
+  // メニューと同じ理由。開閉は class の付け外しだけにする
+  const code = read('src/js/settings.js');
+  assert.ok(!/requestAnimationFrame/.test(code),
+    'src/js/settings.js が rAF を使っている（タブ非表示で開閉が止まる）');
+  assert.ok(!/\.hidden\s*=/.test(code),
+    'src/js/settings.js が hidden 属性を切り替えている（transition と競合する。visibility で隠すこと）');
+});
+
+test('settings.js を、設定を使うスクリプトより先に読んでいる', () => {
+  // 逆だと読み込み時に設定を引けず、保存した値が効かない
+  // （既定の動きのまま動くので気づきにくい）
+  for (const [html, user] of [['src/index.html', 'js/stars.js'], ['src/category.html', 'js/category.js']]) {
+    const code = read(html);
+    const settings = code.indexOf('js/settings.js');
+    assert.ok(settings >= 0, `${html} が js/settings.js を読んでいない`);
+    assert.ok(settings < code.indexOf(user), `${html} が settings.js を ${user} より後に読んでいる`);
+  }
+});
+
+test('設定画面の CSS は両方のページが読む common.css に置いている', () => {
+  // index.css に置くと、カテゴリページで開いたときにスタイルの無い素の要素が並ぶ
+  assert.ok(/\.settings\s*\{/.test(read('src/css/common.css')), 'src/css/common.css に .settings が無い');
+  assert.ok(!/\.settings\s*\{/.test(read('src/css/index.css')), 'src/css/index.css にも .settings がある（二重定義）');
+});
+
+test('再生位置のリセットが stars.js の保存キーを消している', () => {
+  // 食い違うと、リセットを押しても続きの位置が消えない
+  const store = read('src/js/stars.js').match(/var STORE = '([^']+)'/);
+  const prefix = read('src/js/settings.js').match(/var POS_PREFIX = '([^']+)'/);
+  assert.ok(store && prefix, 'stars.js の STORE か settings.js の POS_PREFIX が見つからない');
+  assert.equal(prefix[1], store[1], 'settings.js が消すキーと stars.js が保存するキーが違う');
 });
 
 test('WebGL 非対応時のカテゴリ一覧が残っている', () => {

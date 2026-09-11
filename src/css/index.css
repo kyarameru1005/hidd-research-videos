@@ -414,6 +414,16 @@
 .status b { color: var(--fg-mute); font-weight: 700; }
 .status.is-live { color: var(--accent-ai); }
 
+/* ---------- 設定画面での見た目の切り替え（js/stars.js の applyLook） ---------- */
+
+.constellations.is-off { display: none; }             /* 星座線: なし */
+.overlay.is-still .star::before,
+.overlay.is-still .star::after { animation: none; }   /* 星のまたたき: なし */
+
+/* 画面下の操作ヒント: 隠す。display: none にすると球体の枠の高さが変わるが、
+   描画の大きさはウィンドウのリサイズでしか測り直さないので、場所は残して見えなくする */
+.status.is-off { visibility: hidden; }
+
 /* ---------- フォールバック用ナビ ---------- */
 
 /* 3D が動く環境では左上のメニューが導線なので、球体の下には並べない。
