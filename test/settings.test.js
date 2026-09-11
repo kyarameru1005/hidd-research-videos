@@ -57,6 +57,7 @@ test('既定値がコードに書いてある値と同じ（入れても今ま�
   same('flow', 'src/js/category.js', 'FLOW_PX_PER_SEC');
   assert.equal(item('volume').def, '1');
   assert.equal(item('limit').def, '0');      // 最後まで流す
+  assert.equal(item('bg').def, 'default');   // 今までの背景
   for (const key of ['auto', 'sound', 'lines', 'twinkle', 'hint']) {
     assert.equal(item(key).def, 'on', `${key} の既定がオフになっている`);
   }
@@ -75,6 +76,41 @@ test('数の選択肢が使える範囲に収まっている', () => {
   for (const ms of [...nums('idle'), ...nums('delay')]) assert.ok(ms > 0, `待ち ${ms}`);
   for (const s of nums('limit')) assert.ok(s >= 0, `再生時間 ${s}`);
   for (const px of nums('flow')) assert.ok(px >= 0, `流れる速さ ${px}`);
+});
+
+/** WCAG の相対輝度（#rrggbb） */
+function luminance(hex) {
+  const [r, g, b] = hex.slice(1).match(/../g).map((h) => {
+    const c = parseInt(h, 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrast(a, b) {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+test('背景の選択肢はどれも common.css に塗りがあり、地の色が暗い', () => {
+  // 見本も実物も [data-bg="値"] で塗る。定義が無いと、選んでも見た目が変わらない。
+  // 文字・星・パネルは白系で暗い地を前提にしている（明るい背景は配色ごと作り直しになる）。
+  // 12:1 は WCAG AAA（7:1）より上。模様が重なって明るくなるぶんの余裕を残す
+  const css = read('src/css/common.css').replace(/\/\*[\s\S]*?\*\//g, '');
+  const fg = css.match(/--fg:\s*(#[\da-f]{6})/i);
+  assert.ok(fg, 'src/css/common.css に --fg が無い');
+  for (const [value] of item('bg').options) {
+    const rule = css.match(new RegExp('\\[data-bg="' + value + '"\\][^{}]*\\{([^}]*)\\}'));
+    assert.ok(rule, `src/css/common.css に [data-bg="${value}"] が無い`);
+    assert.ok(/--bg-layers\s*:/.test(rule[1]), `${value}: --bg-layers（模様）が無い`);
+    const bg = rule[1].match(/--bg:\s*(#[\da-f]{6})\s*;/i);
+    assert.ok(bg, `${value}: --bg（地の色）が #rrggbb で書かれていない`);
+    const ratio = contrast(fg[1], bg[1]);
+    assert.ok(ratio >= 12, `${value}: 地の色 ${bg[1]} が明るすぎる（文字とのコントラスト ${ratio.toFixed(1)}:1）`);
+  }
+  // 既定は :root にも当てる（設定を読まない demo/ と、settings.js が動く前の見た目）
+  const def = css.match(/([^{}]*)\[data-bg="default"\]/);
+  assert.ok(def && /:root/.test(def[1]), '既定の背景が :root に当たっていない');
 });
 
 test('normalize: 選択肢に無い値・壊れた値は既定値に戻し、リセットの項目は持たない', () => {
