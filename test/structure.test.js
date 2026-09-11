@@ -243,6 +243,16 @@ test('設定画面の CSS は両方のページが読む common.css に置いて
   assert.ok(!/\.settings\s*\{/.test(read('src/css/index.css')), 'src/css/index.css にも .settings がある（二重定義）');
 });
 
+test('背景の模様を塗る .bg-glow が両方のページにある', () => {
+  // 背景の設定は、地の色（body）と模様（.bg-glow）の 2 か所で効く。
+  // .bg-glow の無いページでは、選んでも地の色しか変わらない
+  for (const html of ['src/index.html', 'src/category.html']) {
+    assert.ok(read(html).includes('class="bg-glow"'), `${html} に .bg-glow が無い`);
+  }
+  assert.ok(/\.bg-glow\s*\{[^}]*background:\s*var\(--bg-layers\)/.test(read('src/css/common.css')),
+    'src/css/common.css の .bg-glow が --bg-layers を塗っていない');
+});
+
 test('再生位置のリセットが stars.js の保存キーを消している', () => {
   // 食い違うと、リセットを押しても続きの位置が消えない
   const store = read('src/js/stars.js').match(/var STORE = '([^']+)'/);

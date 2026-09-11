@@ -8,6 +8,7 @@
  * 項目は分類（GROUPS。パネルではタブになる）ごとに ITEMS へ並べる。
  * 増やすときは ITEMS に 1 つ足し、使う側で HIDDSettings.get(key) を読む
  * （変わったら onChange で知らせる）。パネルの中身は GROUPS と ITEMS から作るので、HTML は触らない。
+ * 背景（bg）だけは例外で、両方のページに同じように効くので、ここで <html> に data-bg を付ける（applyBackground）。
  *
  *   - 開いているあいだは「操作中」として自動再生を止める（stars.js の armIdle が見る）
  *   - 開いたまま放置されたら PANEL_IDLE_MS で自分で閉じ、展示に戻す
@@ -28,6 +29,7 @@ window.HIDDSettings = (function () {
     { key: 'playback', label: '自動再生' },
     { key: 'audio',    label: '音' },
     { key: 'sphere',   label: '球体' },
+    { key: 'backdrop', label: '背景' },
     { key: 'cards',    label: 'カード一覧', page: 'page-category' },
     { key: 'reset',    label: 'リセット' }
   ];
@@ -92,6 +94,18 @@ window.HIDDSettings = (function () {
     {
       group: 'sphere', key: 'hint', label: '画面下の操作ヒント',
       def: 'on', options: [['on', '表示'], ['off', '隠す']]
+    },
+
+    /* ---- 背景（両方のページ） ---- */
+    {
+      group: 'backdrop', key: 'bg', label: '背景', swatch: true,
+      note: '白い文字や星が読めるよう、どれも暗めの色にしてあります。カテゴリページにも同じ背景が付きます。',
+      /* 塗りは common.css の「背景」の節。値がそのまま <html> の data-bg になる（applyBackground）。
+         選択肢を足すときは、common.css にも同じ値の [data-bg] を足す（test/settings.test.js が検査している） */
+      def: 'default', options: [
+        ['default', '既定'], ['starry', '星空'], ['aurora', 'オーロラ'], ['nebula', '星雲'],
+        ['dusk', '夕焼け'], ['ocean', '深海'], ['grid', 'グリッド']
+      ]
     },
 
     /* ---- カード一覧（カテゴリページ） ---- */
@@ -236,7 +250,8 @@ window.HIDDSettings = (function () {
     label.id = 'settings-' + item.key;
     row.appendChild(label);
 
-    var seg = el('div', 'settings__seg');
+    /* swatch の項目（背景）は、選択肢ごとに見本を付けて格子に並べる */
+    var seg = el('div', item.swatch ? 'settings__seg settings__seg--swatch' : 'settings__seg');
     seg.setAttribute('role', 'group');
     seg.setAttribute('aria-labelledby', label.id);
     seg.setAttribute('data-key', item.key);
@@ -244,6 +259,13 @@ window.HIDDSettings = (function () {
       var b = el('button', 'settings__opt', o[1]);
       b.type = 'button';
       b.setAttribute('data-value', o[0]);
+      if (item.swatch) {
+        /* 見本は実物と同じ data-bg で塗る（common.css の「背景」の節） */
+        var sw = el('span', 'settings__swatch');
+        sw.setAttribute('data-bg', o[0]);
+        sw.setAttribute('aria-hidden', 'true');
+        b.insertBefore(sw, b.firstChild);
+      }
       b.addEventListener('click', function () { set(item.key, o[0]); });
       seg.appendChild(b);
     });
@@ -394,10 +416,19 @@ window.HIDDSettings = (function () {
       (e.code === 'KeyS' || String(e.key).toLowerCase() === 's');
   }
 
+  /** 背景は <html> に data-bg を付けるだけ。塗りは common.css の「背景」の節が決める */
+  function applyBackground() {
+    document.documentElement.setAttribute('data-bg', values.bg);
+  }
+
   /* Node（test/）には document が無いので、値の扱いだけ使えるようにしておく */
   if (typeof document !== 'undefined' && document.body) {
+    applyBackground();
     build();
-    onChange(function (key) { reflect(key); });
+    onChange(function (key) {
+      reflect(key);
+      if (key === 'bg') applyBackground();
+    });
 
     document.addEventListener('keydown', function (e) {
       if (isShortcut(e)) {

@@ -1,7 +1,7 @@
 /* HIDD — 共通スタイル（カラートークン・リセット・タイポ） */
 
 :root {
-  --bg:          #06070d;
+  /* 地の色 --bg と背景の模様 --bg-layers は、下の「背景」の節で決める（設定画面で切り替える） */
   --bg-soft:     #0d1020;
   --surface:     rgba(255, 255, 255, 0.04);
   --surface-hi:  rgba(255, 255, 255, 0.08);
@@ -64,15 +64,123 @@ a { color: inherit; text-decoration: none; }
   border: 0;
 }
 
-/* 背景のうっすらした発光（ポストプロセスの代替・描画コストゼロ） */
+/* 背景の模様（ポストプロセスの代替・描画コストゼロ）。塗りは下の「背景」の節の --bg-layers */
 .bg-glow {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background:
+  background: var(--bg-layers);
+}
+
+/* ---------- 背景（設定画面の「背景」タブ） ----------
+   js/settings.js が <html> に data-bg="<値>" を付け、ここで地の色（--bg。html と body が塗る）と
+   模様（--bg-layers。.bg-glow が塗る）を差し替える。設定画面の見本（.settings__swatch）も
+   同じ属性で塗るので、見本と実物が食い違わない。値の一覧は settings.js の ITEMS（key: 'bg'）。
+   - 画像を使わず CSS のグラデーションだけで描く（読み込みが増えない。file:// でも同じ）
+   - 動かさない。常時アニメーションは低スペック PC の方針に反する（CLAUDE.md）
+   - 地の色は暗く保つ。文字・星・パネルは暗い地を前提にした白系の配色のため
+     （test/settings.test.js が文字とのコントラストを見ている）
+   - 模様は半透明にとどめる。.bg-glow は z-index 0 でページの中身より下に置いているが、
+     配置（position）されていない要素があると、その上に重なる
+   既定は :root にも当てる（設定を読まない demo/ と、settings.js が動く前の見た目）。
+   詳細度が同じなので、既定をこの節の先頭に書くこと（後に書いた方が勝つ）。 */
+
+/* 既定: 今までの背景（紺に近い黒、中央にうっすら青い発光） */
+:root,
+[data-bg="default"] {
+  --bg: #06070d;
+  --bg-layers:
     radial-gradient(60% 50% at 50% 42%, rgba(90, 200, 250, 0.10), transparent 70%),
     radial-gradient(45% 40% at 50% 100%, rgba(122, 255, 168, 0.06), transparent 70%);
+}
+
+/* 星空: 上ほど青い夜空に、動かない小さな星と天の川。
+   星は、点を 1 つだけ描いたタイルを敷き詰めた層の重ね合わせ。同じ大きさのタイルに
+   点を複数置くと、星が等間隔の列に並んで見える（実際にそうなった）。層ごとに
+   タイルの大きさを別の素数にして、繰り返しの周期を揃えないようにしている。
+   4 つの層は、点を左上 69×42px（設定画面の見本に写る範囲）に置き、見本にも星が出るようにした */
+[data-bg="starry"] {
+  --bg: #070b1c;
+  --bg-layers:
+    radial-gradient(1.5px 1.5px at 12px 30px, rgba(255, 255, 255, 0.9), transparent) 0 0 / 173px 173px,
+    radial-gradient(1.1px 1.1px at 131px 97px, rgba(220, 230, 255, 0.6), transparent) 0 0 / 197px 197px,
+    radial-gradient(1.8px 1.8px at 52px 10px, rgba(255, 255, 255, 0.85), transparent) 0 0 / 229px 229px,
+    radial-gradient(1.2px 1.2px at 201px 33px, rgba(255, 240, 220, 0.55), transparent) 0 0 / 251px 251px,
+    radial-gradient(1.4px 1.4px at 60px 33px, rgba(255, 255, 255, 0.75), transparent) 0 0 / 283px 283px,
+    radial-gradient(1px 1px at 270px 150px, rgba(210, 225, 255, 0.5), transparent) 0 0 / 311px 311px,
+    radial-gradient(2.2px 2.2px at 30px 17px, rgba(255, 255, 255, 0.9), transparent) 0 0 / 347px 347px,
+    radial-gradient(1.2px 1.2px at 300px 60px, rgba(255, 255, 255, 0.6), transparent) 0 0 / 379px 379px,
+    radial-gradient(1.6px 1.6px at 180px 350px, rgba(200, 220, 255, 0.8), transparent) 0 0 / 409px 409px,
+    radial-gradient(1.1px 1.1px at 380px 210px, rgba(255, 230, 210, 0.6), transparent) 0 0 / 439px 439px,
+    linear-gradient(118deg, transparent 28%, rgba(120, 140, 255, 0.07) 42%,
+      rgba(180, 165, 255, 0.11) 50%, rgba(120, 140, 255, 0.07) 58%, transparent 72%),
+    linear-gradient(to bottom, rgba(40, 70, 170, 0.28), transparent 70%);
+}
+
+/* オーロラ: 画面の上に、緑と青の光の弧が 2 本（楕円の輪を画面の上端より上に置く） */
+[data-bg="aurora"] {
+  --bg: #04101a;
+  --bg-layers:
+    radial-gradient(95% 60% at 38% -8%, transparent 42%, rgba(80, 255, 190, 0.20) 60%, transparent 78%),
+    radial-gradient(85% 55% at 68% -14%, transparent 48%, rgba(110, 170, 255, 0.18) 64%, transparent 80%),
+    radial-gradient(60% 40% at 55% 10%, rgba(160, 110, 255, 0.12), transparent 70%),
+    linear-gradient(to bottom, rgba(40, 200, 170, 0.10), transparent 55%);
+}
+
+/* 星雲: 桃・紫・青の雲に、まばらな星（星の描き方は星空と同じ。層ごとに別の素数のタイル）。
+   まばらにするために層を減らすと、残った層の並びがそのまま列に見える。
+   層の数は保ったまま、タイルを大きくして 1 層あたりの星を減らしている */
+[data-bg="nebula"] {
+  --bg: #0a0716;
+  --bg-layers:
+    radial-gradient(1.5px 1.5px at 40px 60px, rgba(255, 255, 255, 0.8), transparent) 0 0 / 311px 311px,
+    radial-gradient(1.2px 1.2px at 250px 170px, rgba(255, 220, 255, 0.6), transparent) 0 0 / 347px 347px,
+    radial-gradient(1.7px 1.7px at 120px 300px, rgba(255, 255, 255, 0.8), transparent) 0 0 / 379px 379px,
+    radial-gradient(1.1px 1.1px at 330px 90px, rgba(220, 210, 255, 0.55), transparent) 0 0 / 409px 409px,
+    radial-gradient(1.3px 1.3px at 60px 380px, rgba(255, 255, 255, 0.65), transparent) 0 0 / 439px 439px,
+    radial-gradient(1.4px 1.4px at 400px 250px, rgba(255, 235, 250, 0.7), transparent) 0 0 / 467px 467px,
+    radial-gradient(1.1px 1.1px at 210px 460px, rgba(255, 255, 255, 0.5), transparent) 0 0 / 503px 503px,
+    radial-gradient(1.6px 1.6px at 470px 20px, rgba(255, 255, 255, 0.75), transparent) 0 0 / 541px 541px,
+    radial-gradient(42% 36% at 20% 28%, rgba(255, 80, 170, 0.22), transparent 70%),
+    radial-gradient(38% 32% at 70% 20%, rgba(80, 190, 255, 0.14), transparent 70%),
+    radial-gradient(52% 46% at 82% 74%, rgba(110, 80, 255, 0.24), transparent 70%),
+    radial-gradient(46% 36% at 28% 86%, rgba(180, 60, 220, 0.16), transparent 70%);
+}
+
+/* 夕焼け: 下から橙と桃、上は群青 */
+[data-bg="dusk"] {
+  --bg: #0c0818;
+  --bg-layers:
+    radial-gradient(75% 45% at 50% 108%, rgba(255, 150, 80, 0.30), transparent 70%),
+    linear-gradient(to top, rgba(235, 95, 125, 0.20), rgba(140, 60, 170, 0.12) 32%, transparent 62%),
+    linear-gradient(to bottom, rgba(25, 35, 100, 0.40), transparent 50%);
+}
+
+/* 深海: 上から青い光が差し込む（光の筋は画面の上端より上を中心にした扇形） */
+[data-bg="ocean"] {
+  --bg: #020b14;
+  --bg-layers:
+    radial-gradient(100% 62% at 50% -14%, rgba(70, 185, 245, 0.28), transparent 68%),
+    conic-gradient(from 152deg at 50% -25%,
+      transparent 0deg 6deg, rgba(150, 215, 255, 0.05) 9deg, transparent 12deg 19deg,
+      rgba(150, 215, 255, 0.04) 23deg, transparent 27deg 33deg,
+      rgba(150, 215, 255, 0.05) 37deg, transparent 41deg 48deg,
+      rgba(150, 215, 255, 0.04) 51deg, transparent 54deg),
+    radial-gradient(45% 32% at 14% 92%, rgba(0, 200, 170, 0.10), transparent 70%),
+    radial-gradient(45% 32% at 88% 86%, rgba(40, 110, 230, 0.12), transparent 70%);
+}
+
+/* グリッド: 紺地に方眼（40px ごとの細線、200px ごとに少し濃い線）。端は暗く落とす */
+[data-bg="grid"] {
+  --bg: #050b18;
+  --bg-layers:
+    radial-gradient(55% 45% at 50% 45%, rgba(80, 150, 255, 0.14), transparent 70%),
+    radial-gradient(80% 75% at 50% 45%, transparent 35%, rgba(5, 11, 24, 0.7) 100%),
+    linear-gradient(rgba(110, 160, 255, 0.10) 1px, transparent 1px) 0 0 / 200px 200px,
+    linear-gradient(90deg, rgba(110, 160, 255, 0.10) 1px, transparent 1px) 0 0 / 200px 200px,
+    linear-gradient(rgba(110, 160, 255, 0.06) 1px, transparent 1px) 0 0 / 40px 40px,
+    linear-gradient(90deg, rgba(110, 160, 255, 0.06) 1px, transparent 1px) 0 0 / 40px 40px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -220,6 +328,36 @@ a { color: inherit; text-decoration: none; }
   color: var(--bg);
   background: var(--accent-ai);
   font-weight: 700;
+}
+
+/* 見本つきの選択肢（背景）。4 列の格子に並べ、選ばれているものは枠で示す
+   （ほかの項目のように塗りつぶすと、見本が見えなくなるため） */
+.settings__seg--swatch {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+}
+.settings__seg--swatch .settings__opt {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 4px 4px 5px;
+  font-size: 11.5px;
+  border: 1px solid transparent;
+}
+.settings__seg--swatch .settings__opt[aria-pressed="true"] {
+  color: #fff;
+  background: var(--surface-hi);
+  border-color: var(--accent-ai);
+}
+
+/* 見本の中身は、実物と同じ [data-bg] の定義で塗る（common.css の「背景」の節） */
+.settings__swatch {
+  display: block;
+  height: 42px;
+  border-radius: 5px;
+  background: var(--bg-layers), var(--bg);
+  box-shadow: inset 0 0 0 1px var(--border);
 }
 
 /* リセットのボタン。押すとすぐ実行する */
