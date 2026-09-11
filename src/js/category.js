@@ -12,6 +12,7 @@
 
   var DATA = window.HIDD_DATA;
   var GEOM = window.HIDDGeom;
+  var SETTINGS = window.HIDDSettings || null;   /* 設定画面（js/settings.js）。無ければ既定のまま */
 
   var titleEl   = document.getElementById('catTitle');
   var eyebrowEl = document.getElementById('catEyebrow');
@@ -186,7 +187,7 @@
      元の並びの前後に複製を足し、基準の 1 周（home 〜 home + setW）の中を流す。
      端に来たら 1 周ぶん戻すが、周回ごとに同じ並びなので見た目は途切れない。 */
 
-  var FLOW_PX_PER_SEC = 40;   // 流れる速さ（1 コマ約 336px が 8 秒ほどで通り過ぎる）
+  var FLOW_PX_PER_SEC = 40;   // 流れる速さの既定（1 コマ約 336px が 8 秒ほど）。設定画面で変わる
   var RESUME_MS = 4000;       // 手で動かしたあと、流れを再開するまで
   var SETTLE_MS = 150;        // 最後の scroll からこれだけ空いたら、止まったとみなす
 
@@ -247,8 +248,14 @@
     flow();
   }
 
+  /** 1 秒あたりに流す px。設定画面の「カードの流れる速さ」。0 は止める（循環と手での操作は残る） */
+  function flowSpeed() {
+    var v = SETTINGS ? parseFloat(SETTINGS.get('flow')) : NaN;
+    return isFinite(v) ? v : FLOW_PX_PER_SEC;
+  }
+
   function canFlow() {
-    if (!loop || reduceMotion) return false;
+    if (!loop || reduceMotion || !(flowSpeed() > 0)) return false;
     for (var k in holds) if (holds[k]) return false;
     return true;
   }
@@ -260,7 +267,7 @@
     if (!canFlow()) return;
     var dt = lastT ? Math.min(t - lastT, 100) : 0;   /* タブ復帰直後の大きな飛びは捨てる */
     lastT = t;
-    pos = GEOM.wrapStrip(pos + FLOW_PX_PER_SEC * dt / 1000, loop.home, loop.setW);
+    pos = GEOM.wrapStrip(pos + flowSpeed() * dt / 1000, loop.home, loop.setW);
     trackEl.scrollLeft = pos;
     raf = requestAnimationFrame(frame);
   }
@@ -289,6 +296,15 @@
     hold('user', true);
     clearTimeout(resumeTimer);
     resumeTimer = setTimeout(function () { hold('user', false); }, RESUME_MS);
+  }
+
+  /* 設定画面で速さが変わったら、その場で効かせる（開いたまま流れを見て選べる） */
+  if (SETTINGS) {
+    SETTINGS.onChange(function (key) {
+      if (key !== 'flow') return;
+      if (flowSpeed() > 0) flow();
+      else halt();
+    });
   }
 
   /* 止まったら基準の 1 周へ戻しておく（見た目は変わらない）。
@@ -360,12 +376,25 @@
 
   /* ---------------- モーダル ---------------- */
 
+  /* 設定画面の「動画の音」「音量」。トップの自動再生と同じ設定を使う */
+  function applyAudio(v) {
+    if (!SETTINGS) return;
+    v.muted = SETTINGS.get('sound') === 'off';
+    v.volume = parseFloat(SETTINGS.get('volume')) || 1;
+  }
+  if (SETTINGS) {
+    SETTINGS.onChange(function (key) {
+      if (key === 'sound' || key === 'volume') applyAudio(modalPlayer);
+    });
+  }
+
   function openModal(title, file, trigger) {
     hold('modal', true);   /* 見ている間は後ろで流さない */
     lastFocused = trigger || document.activeElement;
     modalTitle.textContent = title;
     modalPlayer.src = file;
     modalOpen.href = file;
+    applyAudio(modalPlayer);
     modal.hidden = false;
     document.body.style.overflow = 'hidden';
     modalPlayer.play().catch(function () {});
