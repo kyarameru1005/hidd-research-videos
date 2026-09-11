@@ -104,7 +104,7 @@ window.HIDDSettings = (function () {
          選択肢を足すときは、common.css にも同じ値の [data-bg] を足す（test/settings.test.js が検査している） */
       def: 'default', options: [
         ['default', '既定'], ['starry', '星空'], ['aurora', 'オーロラ'], ['nebula', '星雲'],
-        ['dusk', '夕焼け'], ['ocean', '深海'], ['grid', 'グリッド'], ['expo', '展示会']
+        ['dusk', '夕焼け'], ['ocean', '深海'], ['grid', 'グリッド'], ['hidd', 'HIDD']
       ]
     },
 
