@@ -210,6 +210,47 @@ test('メニューを開いているあいだは無操作と判定しない', ()
     'armIdle がメニューの開閉を見ていない。メニューを見ている最中に自動再生が始まる');
 });
 
+test('設定画面を開いているあいだは無操作と判定しない', () => {
+  const body = read('src/js/stars.js').match(/function armIdle\(\)\s*\{([\s\S]*?)\n  \}/);
+  assert.ok(body, 'src/js/stars.js に armIdle が無い');
+  assert.ok(/SETTINGS\.isOpen\(\)/.test(body[1]),
+    'armIdle が設定画面の開閉を見ていない。設定している最中に自動再生が始まる');
+});
+
+test('設定画面の開閉を rAF や hidden 属性のタイマーに紐づけていない', () => {
+  // メニューと同じ理由。開閉は class の付け外しだけにする
+  const code = read('src/js/settings.js');
+  assert.ok(!/requestAnimationFrame/.test(code),
+    'src/js/settings.js が rAF を使っている（タブ非表示で開閉が止まる）');
+  assert.ok(!/\.hidden\s*=/.test(code),
+    'src/js/settings.js が hidden 属性を切り替えている（transition と競合する。visibility で隠すこと）');
+});
+
+test('settings.js を、設定を使うスクリプトより先に読んでいる', () => {
+  // 逆だと読み込み時に設定を引けず、保存した値が効かない
+  // （既定の動きのまま動くので気づきにくい）
+  for (const [html, user] of [['src/index.html', 'js/stars.js'], ['src/category.html', 'js/category.js']]) {
+    const code = read(html);
+    const settings = code.indexOf('js/settings.js');
+    assert.ok(settings >= 0, `${html} が js/settings.js を読んでいない`);
+    assert.ok(settings < code.indexOf(user), `${html} が settings.js を ${user} より後に読んでいる`);
+  }
+});
+
+test('設定画面の CSS は両方のページが読む common.css に置いている', () => {
+  // index.css に置くと、カテゴリページで開いたときにスタイルの無い素の要素が並ぶ
+  assert.ok(/\.settings\s*\{/.test(read('src/css/common.css')), 'src/css/common.css に .settings が無い');
+  assert.ok(!/\.settings\s*\{/.test(read('src/css/index.css')), 'src/css/index.css にも .settings がある（二重定義）');
+});
+
+test('再生位置のリセットが stars.js の保存キーを消している', () => {
+  // 食い違うと、リセットを押しても続きの位置が消えない
+  const store = read('src/js/stars.js').match(/var STORE = '([^']+)'/);
+  const prefix = read('src/js/settings.js').match(/var POS_PREFIX = '([^']+)'/);
+  assert.ok(store && prefix, 'stars.js の STORE か settings.js の POS_PREFIX が見つからない');
+  assert.equal(prefix[1], store[1], 'settings.js が消すキーと stars.js が保存するキーが違う');
+});
+
 test('WebGL 非対応時のカテゴリ一覧が残っている', () => {
   // 球体の下の一覧は左上のメニューへ移したが、3D が使えない環境では
   // これが唯一の導線になる。display: none にしたまま復帰させ忘れないこと。
