@@ -412,6 +412,22 @@ a { color: inherit; text-decoration: none; }
 }
 .settings__action:hover { border-color: var(--border-hi); background: var(--surface-hi); }
 
+/* スライダー（再生カードの大きさ）。つまみと溝の色はブラウザに任せる（accent-color） */
+.settings__value {
+  float: right;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent-ai);
+}
+
+.settings__range {
+  display: block;
+  width: 100%;
+  margin: 2px 0 0;
+  accent-color: var(--accent-ai);
+  cursor: pointer;
+}
+
 .settings__note {
   margin: 7px 0 0;
   font-size: 11.5px;

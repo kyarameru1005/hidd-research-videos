@@ -6,6 +6,10 @@
   --head-top: clamp(10px, 2vh, 18px);  /* 画面の上端からの距離 */
   --head-h: 38px;                      /* メニューボタンの大きさ。ロゴ（最大 36px）より大きいので、これがヘッダーの高さ */
   --head-gap: 8px;                     /* ヘッダーと再生カードのあいだに最低限あける隙間 */
+
+  /* 再生カードの大きさ（設定画面のスライダー。0〜1）。stars.js が <html> に書く。
+     0 なら枠に戻したときの 430px、1 ならヘッダーの下いっぱい */
+  --card-ratio: 1;
 }
 
 .page-index {
@@ -186,25 +190,30 @@
 .grow {
   position: fixed;
   inset: 0;
+  /* ヘッダー（左上のロゴ）の下だけを使う。カードはこの範囲の中央に置くので、
+     どれだけ大きくしてもロゴには重ならない */
+  padding: calc(var(--head-top) + var(--head-h) + var(--head-gap)) 0 var(--head-gap);
   display: grid;
   place-items: center;
   z-index: 500;
 }
 .grow[hidden] { display: none; }
 
-/* 幅は 1065px を上限に、画面の幅と高さの両方で抑える。
-   16:9 の動画は幅を広げるほど縦に伸びるので、低い画面では高さで決めないと下が切れる。
+/* 大きさは設定画面のスライダー（--card-ratio）で 430px 〜 --card-max のあいだを動く。
 
-   高さの上限は「左上のヘッダーに重ならないこと」で決める。カードは画面の中央に置くので
-   上下に同じだけ余白ができる。その余白がヘッダーの下端（--head-top + --head-h）＋ --head-gap
-   より小さくならない高さまでしか広げない。
-
+   --card-max は「ヘッダーの下の領域に収まる最大」。16:9 の動画は幅を広げるほど縦に伸びるので、
+   使える高さ（画面の高さ − ヘッダーの下端 − 下の隙間）から逆算する。
    163px = 動画以外の縦。タイトルが 2 行になったときの値を使う（1 行なら 140px）。
    1 行で計算すると、2 行になったぶんカードが伸びてヘッダーに食い込む。
-   30px = 左右の padding とボーダー（border-box なので幅に含まれる） */
+   30px = 左右の padding とボーダー（border-box なので幅に含まれる）。
+   88% は狭い画面で左右に余白を残すため。
+
+   min() で包んでいるのは、画面が低くて --card-max が 430px を下回るときに、
+   スライダーを左端にしてもはみ出さないようにするため。 */
 .grow__card {
-  width: min(1065px, 88%,
-             calc((100vh - (var(--head-top) + var(--head-h) + var(--head-gap)) * 2 - 163px) * 16 / 9 + 30px));
+  --card-max: min(88%,
+                  calc((100vh - var(--head-top) - var(--head-h) - var(--head-gap) * 2 - 163px) * 16 / 9 + 30px));
+  width: min(var(--card-max), calc(430px + (var(--card-max) - 430px) * var(--card-ratio)));
   padding: 14px;
   background: rgba(9, 11, 22, .96);
   border: 1px solid var(--border-hi);
