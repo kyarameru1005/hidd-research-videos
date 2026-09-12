@@ -738,6 +738,12 @@
   /* 設定が変わったら、その場で効かせる。再生中の動画の音・音量も切り替える
      （設定画面のボタンを押す操作が入るので、音を戻しても自動再生の制限には掛からない想定）。
      放置の秒数・再生までの秒数・再生時間・自動再生のする／しないは、使うときに読むので何もしない */
+  /** 再生カードの大きさ（設定画面のスライダー）。CSS は --card-ratio（0〜1）で受ける */
+  function applyCardSize() {
+    var pct = Math.max(0, Math.min(100, setting('cardSize', 100)));
+    document.documentElement.style.setProperty('--card-ratio', String(pct / 100));
+  }
+
   if (SETTINGS) {
     SETTINGS.onChange(function (key, value) {
       var v = growPlayer.querySelector('video');
@@ -746,6 +752,7 @@
       else if (key === 'sound') { if (v) v.muted = !soundOn(); }
       else if (key === 'volume') { if (v) v.volume = setting('volume', 1); }
       else if (key === 'lines' || key === 'twinkle' || key === 'hint') applyLook();
+      else if (key === 'cardSize') applyCardSize();
       else if (key === 'resetPos') bag = null;   /* 再生の順番も最初から作り直す */
     });
   }
@@ -942,6 +949,7 @@
   });
 
   applyLook();
+  applyCardSize();
   resize();
   drawFrame();
   updateStatus();
