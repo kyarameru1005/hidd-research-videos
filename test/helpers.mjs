@@ -24,6 +24,18 @@ export function read(...parts) {
 }
 
 /**
+ * python3 や Chrome のような、Node の外のプログラムが要る検査の skip 指定。
+ *
+ * 手元に無ければ飛ばす（理由は結果に出る）。CI（環境変数 CI が立つ）では飛ばさずに落とす。
+ * CI で黙って飛ばすと、何も検査していないのに緑になるため。
+ */
+export function skipWithout(found, what) {
+  if (found) return false;
+  if (process.env.CI) throw new Error(`${what} が見つからない（CI では飛ばさない）`);
+  return `${what} が見つからないので飛ばした`;
+}
+
+/**
  * ブラウザ用スクリプトを偽 window の上で実行し、その window を返す。
  *
  * 読み込み後も globalThis.window は残したままにする。

@@ -68,22 +68,18 @@
 
 </main>
 
-<!-- 星から生えてくる再生カード。
-     表示領域いっぱいに広がるので body 直下に置く。
-     .stage（z-index: 1）の中に入れると重なり順がそこで閉じてしまい、
+<!-- 星から生えてくる再生カード（枠のあるカードを球体の上に浮かせる）。
+     body 直下に置く。.stage（z-index: 1）の中に入れると重なり順がそこで閉じてしまい、
      左上の見出し（.site-head）より上に出せない。 -->
 <div class="grow" id="grow" hidden>
   <div class="grow__card" id="growCard">
-    <!-- 動画が先。文字は上に重ねる（行として置くと、その分だけ動画が小さくなる） -->
-    <div class="grow__player" id="growPlayer"></div>
-    <div class="grow__info">
-      <div class="grow__head">
-        <span class="grow__lab" id="growLab"></span>
-        <button class="grow__close" type="button" id="growClose" aria-label="閉じる">&times;</button>
-      </div>
-      <h2 class="grow__title" id="growTitle"></h2>
-      <p class="grow__summary" id="growSummary"></p>
+    <div class="grow__head">
+      <span class="grow__lab" id="growLab"></span>
+      <button class="grow__close" type="button" id="growClose" aria-label="閉じる">&times;</button>
     </div>
+    <h2 class="grow__title" id="growTitle"></h2>
+    <div class="grow__player" id="growPlayer"></div>
+    <p class="grow__summary" id="growSummary"></p>
     <div class="grow__bar"><span id="growProgress"></span></div>
   </div>
 </div>

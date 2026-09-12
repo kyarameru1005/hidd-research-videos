@@ -83,15 +83,23 @@ node --test test/*.test.js
 ```
 
 npm は使わない。Node 標準のテストランナーだけで動く。
+push（`main` / `dev`）と PR では GitHub Actions（`.github/workflows/test.yml`）が同じコマンドを回す。
 
-- `test/data.test.js` — `src/js/data.js` の整合性
+- `test/data.test.js` — `src/js/data.js` の整合性と、動画一覧（`videos.js`）の中身
 - `test/geometry.test.js` — 回転の計算（カテゴリが正面に来ること）
+- `test/settings.test.js` — 設定画面の値の扱い
 - `test/structure.test.js` — **このファイルに書いた制約の自動検査**
+- `test/serve.test.js` — `serve.py` の Range と動画一覧の生成（`python3` が要る）
+- `test/browser.test.js` — headless Chrome で `file://` のページを開いて動きを見る（Chrome が要る）
+
+`python3` や Chrome が無い環境では、その検査だけ飛ばす（CI では飛ばさずに落とす）。
 
 `structure.test.js` が落ちたときは、たいてい `file://` で開けなくなっているか、
 過去に踏んだ不具合を踏み直している。メッセージに理由が書いてある。
 
 **DOM に依存しないロジックは `src/js/geometry.js` に置く。** ここに置けばテストできる。
+ブラウザでしか確かめられない動き（押したら開く、放置したら始まる）は `browser.test.js` に足す。
+Puppeteer などは入れず、`test/chrome.mjs` 経由で Chrome を操作する。
 
 ### ブラウザでの確認
 
@@ -107,6 +115,9 @@ python3 serve.py        # /src/ が本番、/demo/ がデモ
 - ラベルが画面端でクランプされていないか、下部ナビと重なっていないか
 - `file://`（`src/index.html` を直接開く）でも動くか
 
+コンソールエラー・クリックと遷移・`file://` での動作は `browser.test.js` も見ているが、
+見た目（ラベルのクランプや重なり）と動画の再生は人の目で確認する。
+
 ### 検証環境の制約
 
 Claude が使う検証タブは常にバックグラウンド扱いになるため、
@@ -114,6 +125,9 @@ Claude が使う検証タブは常にバックグラウンド扱いになるた�
 スクリーンショットを撮ると数フレームだけ進む。
 この環境で「動画が再生されない」ことをバグと判断しないこと。
 再生の確認はユーザーに依頼する。
+
+テストが使う headless Chrome は逆に、常に表示中の扱いで rAF が動く（裏のタブにできない）。
+「裏のタブで止まる」系の不具合はテストでは再現できず、`structure.test.js` の静的な検査が受け持つ。
 
 ## 動画はローカルファイルのみ
 

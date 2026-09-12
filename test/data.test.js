@@ -4,9 +4,17 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { loadBrowserScripts } from './helpers.mjs';
+import vm from 'node:vm';
+import { read, loadBrowserScripts } from './helpers.mjs';
 
 const { HIDD_DATA: DATA } = loadBrowserScripts('src/js/data.js');
+
+/** serve.py が書き出した動画一覧（src/js/videos.js）。data.js とは別の文脈で読む */
+const FILES = (() => {
+  const ctx = vm.createContext({ window: {} });
+  vm.runInContext(read('src/js/videos.js'), ctx, { filename: 'src/js/videos.js' });
+  return JSON.parse(JSON.stringify(ctx.window.HIDD_VIDEO_FILES || {}));
+})();
 const HEX = /^#[0-9a-f]{6}$/i;
 
 test('カテゴリが 1 件以上ある', () => {
@@ -143,6 +151,35 @@ test('applyVideoFiles が URL を壊す文字を含むファイル名を扱え�
   assert.equal(cat.videos[0].title, 'C#とC++の比較');
 
   cat.videos = before;
+});
+
+/* --- 動画一覧（src/js/videos.js）の中身 ---
+   コミットされた一覧は、その時点で手元にあった src/videos/<カテゴリid>/ を映している。
+   フォルダ側の間違いは、ページではエラーにならず「出てこない」「空の札になる」だけなので、ここで見る。 */
+
+test('動画一覧のカテゴリがすべて data.js にある（フォルダ名の打ち間違い・改名漏れ）', () => {
+  // data.js に無い id のフォルダに置いた動画は、どこにも表示されない
+  const ids = DATA.categories.map((c) => c.id);
+  const unknown = Object.keys(FILES).filter((id) => !ids.includes(id));
+  assert.deepEqual(unknown, [], 'data.js の categories に無いフォルダ名（src/videos/<ここ>/）');
+});
+
+test('動画一覧のどのファイル名からもタイトルが取り出せる', () => {
+  // 「（山田）.mp4」のような名前だとタイトルが空になり、札に何も出ない
+  for (const [id, names] of Object.entries(FILES)) {
+    assert.ok(Array.isArray(names) && names.length > 0, `${id}: 一覧が空（serve.py は空のフォルダを書き出さない）`);
+    for (const name of names) {
+      assert.ok(DATA.parseVideoName(name).title, `src/videos/${id}/${name}: タイトルが空になる`);
+    }
+  }
+});
+
+test('同じカテゴリに同じタイトルの動画が重なっていない（ダウンロードし直した (1) の取り残しなど）', () => {
+  for (const [id, names] of Object.entries(FILES)) {
+    const titles = names.map((n) => DATA.parseVideoName(n).title);
+    const dup = titles.filter((t, i) => titles.indexOf(t) !== i);
+    assert.deepEqual(dup, [], `src/videos/${id}/ に同じタイトルが 2 本以上ある`);
+  }
 });
 
 test('applyVideoFiles は空のカテゴリを書き換えない（実物を置く前でも動く）', () => {

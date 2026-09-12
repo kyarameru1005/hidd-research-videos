@@ -117,6 +117,8 @@ class RangeHandler(http.server.SimpleHTTPRequestHandler):
             f.close()
             self.send_response(416)
             self.send_header("Content-Range", "bytes */%d" % size)
+            # 本文が無いことを明示する。書かないと、接続を使い回すブラウザが続きを待ち続ける
+            self.send_header("Content-Length", "0")
             self.end_headers()
             return None
 
