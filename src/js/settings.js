@@ -206,7 +206,7 @@ window.HIDDSettings = (function () {
   /** fn(key, value)。リセットの項目を実行したときは value が null で来る */
   function onChange(fn) { listeners.push(fn); }
 
-  /** 動画ごとの再生位置（stars.js が保存している）を全部消す。消した数を返す */
+  /** 動画ごとの再生位置（更新前の stars.js が保存していたもの）を全部消す。消した数を返す */
   function clearPositions() {
     var n = 0;
     try {
