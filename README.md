@@ -23,7 +23,12 @@ node --test test/*.test.js
 ```
 
 Node 標準のテストランナーだけで動きます（npm 不要）。
-データの整合性、回転の計算、構成の決まりごと（`file://` で開けるか、外部依存が混じっていないか）を検査します。
+データの整合性、回転の計算、構成の決まりごと（`file://` で開けるか、外部依存が混じっていないか）に加えて、
+`serve.py` の部分取得（Range）と動画一覧の生成、headless Chrome で開いたページの動き
+（エラーが出ないか、星を押すとカードが開くか、放置すると自動再生が始まるか）を検査します。
+`python3` と Chrome が無い環境では、その検査だけ飛ばします。
+
+push（`main` / `dev`）と PR のたびに、GitHub Actions が同じテストを回します（`.github/workflows/test.yml`）。
 
 ## ディレクトリ
 
@@ -51,6 +56,7 @@ docs/               ドキュメント
   decisions.md        設計判断と落とし穴の記録
 
 test/               テスト（node --test test/*.test.js）
+.github/workflows/  CI（push と PR でテストを回す）
 serve.py            簡易サーバー（Range 対応）
 CLAUDE.md           このリポジトリでの作業指示
 ```
