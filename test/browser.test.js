@@ -117,6 +117,17 @@ describe('ブラウザ（headless Chrome）', { skip, concurrency: 3 }, () => {
     });
   });
 
+  // こちらも 10 秒ほど待つ
+  test('トップ: 「球体だけ」だと、巡回に入っても動画のカードは開かない', async () => {
+    await withPage(fileUrl('src/index.html'),
+      { preload: withSettings({ auto: 'tour', delay: '3000' }) + WATCH_CARD },
+      async (page) => {
+        await new Promise((resolve) => setTimeout(resolve, 5000 + 3000 + 2000));
+        const opened = await page.evaluate('window.__card.opened');
+        assert.equal(opened, null, '「球体だけ」なのに動画のカードが開いた');
+      });
+  });
+
   test('トップ: file:// で開き、星とメニューが data.js どおりに並ぶ', async (t) => {
     t.diagnostic(browser.product);
     await withPage(fileUrl('src/index.html'), {}, async (page) => {

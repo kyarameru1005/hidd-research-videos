@@ -5,6 +5,7 @@
  * ・1 等星＝カテゴリ。押すとそのカテゴリを選択し、周りの動画の星が浮かび上がる
  * ・小さな星を押すと、その星からカードが生えて動画が再生される
  * ・操作がないと IDLE_MS 後に球体が巡回を始め、さらに PLAY_MS 後に動画を自動再生する
+ *   （設定画面で「球体だけ」にすると、動画は流さず巡回を続けたままにする）
  * ・再生が終わったら次の動画へ。どこかを触れば即座に止まる（＝人が操作を取り戻す）
  *
  * 展示（無人ディスプレイ）を主眼に置いているので、以下を守っている。
@@ -818,6 +819,9 @@
       tourStep = 0;
       beginTourLeg();
       requestRender();
+      /* 「球体だけ」なら巡回のまま留まる。動画は流さない（stopWatchdog 等は
+         phase が playing にならないので出番がない） */
+      if (SETTINGS && SETTINGS.get('auto') === 'tour') return;
       playTimer = setTimeout(function () {
         playTimer = null;
         if (document.hidden) return;
