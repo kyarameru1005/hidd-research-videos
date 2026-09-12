@@ -42,8 +42,9 @@ window.HIDDSettings = (function () {
     /* ---- 自動再生（トップ） ---- */
     {
       group: 'playback', key: 'auto', label: '放置したときの自動再生',
-      note: 'しない にすると、放置しても球体は回らず、動画も流れません。説明や発表で人が操作するとき向け。',
-      def: 'on', options: [['on', 'する'], ['off', 'しない']]
+      note: '球体だけ にすると、放置すると球体は回り続けますが動画は流しません。' +
+            'しない にすると、放置しても球体は回らず、動画も流れません。説明や発表で人が操作するとき向け。',
+      def: 'on', options: [['on', 'する'], ['tour', '球体だけ'], ['off', 'しない']]
     },
     {
       group: 'playback', key: 'idle', label: '放置してから球体が回り出すまで',
@@ -55,7 +56,7 @@ window.HIDDSettings = (function () {
     },
     {
       group: 'playback', key: 'limit', label: '1 本あたりの再生時間',
-      note: '自動再生のときだけ区切ります。途中で次へ送った動画は、次に回ってきたときに続きから流します。',
+      note: '自動再生のときだけ区切ります。動画は常に頭から流すので、途中で次へ送った動画も次はまた頭から流れます。',
       def: '0', options: [['0', '最後まで'], ['30', '30 秒'], ['60', '1 分'], ['180', '3 分']]
     },
 
@@ -206,7 +207,7 @@ window.HIDDSettings = (function () {
   /** fn(key, value)。リセットの項目を実行したときは value が null で来る */
   function onChange(fn) { listeners.push(fn); }
 
-  /** 動画ごとの再生位置（stars.js が保存している）を全部消す。消した数を返す */
+  /** 動画ごとの再生位置（更新前の stars.js が保存していたもの）を全部消す。消した数を返す */
   function clearPositions() {
     var n = 0;
     try {

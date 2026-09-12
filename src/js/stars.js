@@ -5,6 +5,7 @@
  * ・1 等星＝カテゴリ。押すとそのカテゴリを選択し、周りの動画の星が浮かび上がる
  * ・小さな星を押すと、その星からカードが生えて動画が再生される
  * ・操作がないと IDLE_MS 後に球体が巡回を始め、さらに PLAY_MS 後に動画を自動再生する
+ *   （設定画面で「球体だけ」にすると、動画は流さず巡回を続けたままにする）
  * ・再生が終わったら次の動画へ。どこかを触れば即座に止まる（＝人が操作を取り戻す）
  *
  * 展示（無人ディスプレイ）を主眼に置いているので、以下を守っている。
@@ -33,7 +34,7 @@
   var STAR_R = 1.0;
   var MAJOR_R = 1.0;
 
-  var STORE = 'hidd.pos.';        /* 再生位置の保存キー */
+  var STORE = 'hidd.pos.';        /* 更新前に保存していた再生位置のキー接頭辞（今は書かないが、古いキーの掃除に使う） */
 
   /* ---------------- 展示の設定 ----------------
      ここに書いた値は既定値。設定画面（js/settings.js、Ctrl + Shift + S）で
@@ -523,13 +524,6 @@
     if (i >= 0) bag.splice(i, 1);
   }
 
-  function savedPos(entry) {
-    try {
-      var v = parseFloat(localStorage.getItem(STORE + entry.id) || '0');
-      return isFinite(v) ? v : 0;
-    } catch (e) { return 0; }
-  }
-
   /** auto は放置による自動再生のとき true（1 本あたりの再生時間で区切る） */
   function pickAndPlay(entry, auto) {
     markPlayed(entry);
@@ -573,7 +567,7 @@
     }
   }
 
-  /** ローカル動画。自動再生・終了検知・再生位置の復元ができる */
+  /** ローカル動画。自動再生・終了検知ができる。再生位置は保持せず必ず頭から流す */
   function playLocal(entry, auto) {
     var v = document.createElement('video');
     v.src = entry.file;
@@ -584,22 +578,12 @@
     v.volume = setting('volume', 1);
     growPlayer.appendChild(v);
 
-    var resumeAt = savedPos(entry);
-    v.addEventListener('loadedmetadata', function () {
-      if (resumeAt > 1 && resumeAt < v.duration - 2) v.currentTime = resumeAt;
-    });
-
-    var lastSave = 0;
     v.addEventListener('timeupdate', function () {
       if (v.duration) growProgress.style.width = (v.currentTime / v.duration * 100).toFixed(1) + '%';
-      var now = performance.now();
-      if (now - lastSave > 1000) {
-        lastSave = now;
-        try { localStorage.setItem(STORE + entry.id, String(v.currentTime)); } catch (e) {}
-      }
     });
 
     v.addEventListener('ended', function () {
+      /* 再生位置は保存していないが、更新前に残った古いキーがあれば掃除する */
       try { localStorage.removeItem(STORE + entry.id); } catch (e) {}
       if (phase === 'playing') setTimeout(function () { if (phase === 'playing') autoNext(); }, 900);
     });
@@ -611,14 +595,13 @@
     startWatchdog(function () { return v.currentTime; });
 
     /* 放置による自動再生のときだけ、1 本あたりの再生時間で区切る（設定画面）。
-       星を押して選んだ動画は最後まで流す。区切った動画の再生位置は保存しない
-       （残すと次に回ってきたときに続きから流れてしまい、区切る意味がなくなる）。
-       毎回頭出しで見せて 1 回分の再生として扱う。進行なので rAF ではなく setTimeout で出す */
+       星を押して選んだ動画は最後まで流す。動画は常に頭から流すので、
+       区切っても次に回ってきたときにまた頭から見せられる。
+       進行なので rAF ではなく setTimeout で出す */
     var limit = auto ? setting('limit', 0) : 0;
     if (limit > 0) {
       limitTimer = setTimeout(function () {
         limitTimer = null;
-        try { localStorage.removeItem(STORE + entry.id); } catch (e) {}
         if (phase === 'playing' && current === entry) autoNext();
       }, limit * 1000);
     }
@@ -836,6 +819,9 @@
       tourStep = 0;
       beginTourLeg();
       requestRender();
+      /* 「球体だけ」なら巡回のまま留まる。動画は流さない（stopWatchdog 等は
+         phase が playing にならないので出番がない） */
+      if (SETTINGS && SETTINGS.get('auto') === 'tour') return;
       playTimer = setTimeout(function () {
         playTimer = null;
         if (document.hidden) return;
