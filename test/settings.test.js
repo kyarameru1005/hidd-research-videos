@@ -37,7 +37,14 @@ test('項目の key が重複せず、どれかの分類に入っている（空
 
 test('値の項目は既定値が選択肢の中にあり、リセットの項目は実行できる', () => {
   for (const x of valueItems) {
-    assert.ok(x.options.some((o) => o[0] === x.def), `${x.key}: 既定値 ${x.def} が選択肢に無い`);
+    if (x.type === 'range') {
+      const def = parseFloat(x.def);
+      assert.ok(x.max > x.min && x.step > 0, `${x.key}: min / max / step が不正`);
+      assert.ok(def >= x.min && def <= x.max, `${x.key}: 既定値 ${x.def} が範囲の外`);
+      assert.equal((def - x.min) % x.step, 0, `${x.key}: 既定値 ${x.def} が刻み ${x.step} に乗っていない`);
+    } else {
+      assert.ok(x.options.some((o) => o[0] === x.def), `${x.key}: 既定値 ${x.def} が選択肢に無い`);
+    }
   }
   for (const x of S.items.filter((y) => y.type === 'action')) {
     assert.equal(typeof x.run, 'function', `${x.key}: run が無い`);
@@ -111,6 +118,29 @@ test('背景の選択肢はどれも common.css に塗りがあり、地の色�
   // 既定は :root にも当てる（設定を読まない demo/ と、settings.js が動く前の見た目）
   const def = css.match(/([^{}]*)\[data-bg="default"\]/);
   assert.ok(def && /:root/.test(def[1]), '既定の背景が :root に当たっていない');
+});
+
+test('スライダーの項目は、範囲外・刻みに乗らない値を受け付けない', () => {
+  // 保存先は手でも書き換えられるので、範囲と刻みの両方で弾く
+  assert.equal(item('cardSize').def, '100');        // 既定はいっぱいまで（今までの見た目）
+  assert.equal(S.set('cardSize', '150'), false);    // 範囲の外
+  assert.equal(S.set('cardSize', '-5'), false);
+  assert.equal(S.set('cardSize', '52'), false);     // 刻み（5）に乗らない
+  assert.equal(S.set('cardSize', 'おおきく'), false);
+  assert.equal(S.get('cardSize'), '100');
+  assert.equal(S.set('cardSize', '50'), true);
+  assert.equal(S.get('cardSize'), '50');
+  assert.equal(S.normalize({ cardSize: '999' }).cardSize, '100');   // 壊れていたら既定へ
+  assert.equal(S.normalize({ cardSize: '25' }).cardSize, '25');
+  S.set('cardSize', '100');
+});
+
+test('再生カードの大きさが、設定画面から CSS までつながっている', () => {
+  // スライダーの値は stars.js が --card-ratio として <html> に書き、index.css がそれで幅を決める
+  assert.match(read('src/js/stars.js'), /setProperty\('--card-ratio'/);
+  const css = read('src/css/index.css');
+  assert.match(css, /--card-ratio/, 'index.css が --card-ratio を使っていない');
+  assert.match(css, /--card-max/, 'index.css に大きさの上限（--card-max）が無い');
 });
 
 test('normalize: 選択肢に無い値・壊れた値は既定値に戻し、リセットの項目は持たない', () => {

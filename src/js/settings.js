@@ -29,6 +29,7 @@ window.HIDDSettings = (function () {
     { key: 'playback', label: '自動再生' },
     { key: 'audio',    label: '音' },
     { key: 'sphere',   label: '球体' },
+    { key: 'card',     label: '再生カード' },
     { key: 'backdrop', label: '背景' },
     { key: 'cards',    label: 'カード一覧', page: 'page-category' },
     { key: 'reset',    label: 'リセット' }
@@ -96,6 +97,14 @@ window.HIDDSettings = (function () {
       def: 'on', options: [['on', '表示'], ['off', '隠す']]
     },
 
+    /* ---- 再生カード（トップ） ---- */
+    {
+      group: 'card', key: 'cardSize', type: 'range', label: '大きさ',
+      note: '左端は枠に戻したときの大きさ（430px）、右端は左上のロゴに重ならない範囲でいっぱいまで。' +
+            '実際の px は画面の大きさで変わります。',
+      def: '100', min: 0, max: 100, step: 5, unit: '%'
+    },
+
     /* ---- 背景（両方のページ） ---- */
     {
       group: 'backdrop', key: 'bg', label: '背景', swatch: true,
@@ -134,6 +143,7 @@ window.HIDDSettings = (function () {
   ];
 
   function isAction(item) { return item.type === 'action'; }
+  function isRange(item) { return item.type === 'range'; }
 
   function find(key) {
     for (var i = 0; i < ITEMS.length; i++) if (ITEMS[i].key === key) return ITEMS[i];
@@ -141,7 +151,15 @@ window.HIDDSettings = (function () {
   }
 
   function allowed(item, value) {
-    return !isAction(item) && item.options.some(function (o) { return o[0] === value; });
+    if (isAction(item)) return false;
+    /* スライダーは範囲と刻みで見る。手で書き換えられた値・古い版の値を弾くため、
+       文字列としても正規の形（'50' であって '50.0' や ' 50' ではない）であることまで見る */
+    if (isRange(item)) {
+      var n = parseFloat(value);
+      return isFinite(n) && String(n) === String(value) &&
+        n >= item.min && n <= item.max && (n - item.min) % item.step === 0;
+    }
+    return item.options.some(function (o) { return o[0] === value; });
   }
 
   /** 保存されていた値を今の選択肢に揃える。選択肢に無い値（古い版の値・壊れた値）は既定に戻す */
@@ -235,9 +253,20 @@ window.HIDDSettings = (function () {
     return e;
   }
 
-  /** 選ばれている値のボタンに印を付ける */
+  /** 今の値を部品に反映する（選択肢なら印、スライダーならつまみと数値） */
   function reflect(key) {
-    var seg = panel.querySelector('[data-key="' + key + '"]');
+    var item = find(key);
+    if (!item || isAction(item)) return;
+
+    if (isRange(item)) {
+      var input = panel.querySelector('input.settings__range[data-key="' + key + '"]');
+      var out = panel.querySelector('output.settings__value[data-key="' + key + '"]');
+      if (input && input.value !== values[key]) input.value = values[key];
+      if (out) out.textContent = values[key] + (item.unit || '');
+      return;
+    }
+
+    var seg = panel.querySelector('.settings__seg[data-key="' + key + '"]');
     if (!seg) return;
     Array.prototype.forEach.call(seg.querySelectorAll('.settings__opt'), function (b) {
       b.setAttribute('aria-pressed', b.getAttribute('data-value') === values[key] ? 'true' : 'false');
@@ -270,6 +299,33 @@ window.HIDDSettings = (function () {
       seg.appendChild(b);
     });
     row.appendChild(seg);
+
+    if (item.note) row.appendChild(el('p', 'settings__note', item.note));
+    return row;
+  }
+
+  function rangeRow(item) {
+    var row = el('div', 'settings__row');
+    var label = el('p', 'settings__label', item.label);
+    label.id = 'settings-' + item.key;
+
+    /* 今の値は見出しの行に出す。スライダーの下に置くと、動かすたびに行の高さが揺れる */
+    var out = el('output', 'settings__value');
+    out.setAttribute('data-key', item.key);
+    label.appendChild(out);
+    row.appendChild(label);
+
+    var input = document.createElement('input');
+    input.type = 'range';
+    input.className = 'settings__range';
+    input.min = item.min;
+    input.max = item.max;
+    input.step = item.step;
+    input.setAttribute('data-key', item.key);
+    input.setAttribute('aria-labelledby', label.id);
+    /* 動かしている最中から効かせる。change だけだと、つまみを離すまで見た目が変わらない */
+    input.addEventListener('input', function () { set(item.key, input.value); });
+    row.appendChild(input);
 
     if (item.note) row.appendChild(el('p', 'settings__note', item.note));
     return row;
@@ -345,7 +401,9 @@ window.HIDDSettings = (function () {
       body.setAttribute('role', 'tabpanel');
       body.setAttribute('aria-labelledby', tab.id);
       ITEMS.forEach(function (item) {
-        if (item.group === g.key) body.appendChild(isAction(item) ? actionRow(item) : choiceRow(item));
+        if (item.group !== g.key) return;
+        body.appendChild(isAction(item) ? actionRow(item)
+          : isRange(item) ? rangeRow(item) : choiceRow(item));
       });
       panel.appendChild(body);
       tabs.push({ key: g.key, tab: tab, body: body });
