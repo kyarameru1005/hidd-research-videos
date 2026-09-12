@@ -611,12 +611,14 @@
     startWatchdog(function () { return v.currentTime; });
 
     /* 放置による自動再生のときだけ、1 本あたりの再生時間で区切る（設定画面）。
-       星を押して選んだ動画は最後まで流す。区切った動画は再生位置が残るので、
-       次に回ってきたときに続きから流れる。進行なので rAF ではなく setTimeout で出す */
+       星を押して選んだ動画は最後まで流す。区切った動画の再生位置は保存しない
+       （残すと次に回ってきたときに続きから流れてしまい、区切る意味がなくなる）。
+       毎回頭出しで見せて 1 回分の再生として扱う。進行なので rAF ではなく setTimeout で出す */
     var limit = auto ? setting('limit', 0) : 0;
     if (limit > 0) {
       limitTimer = setTimeout(function () {
         limitTimer = null;
+        try { localStorage.removeItem(STORE + entry.id); } catch (e) {}
         if (phase === 'playing' && current === entry) autoNext();
       }, limit * 1000);
     }
