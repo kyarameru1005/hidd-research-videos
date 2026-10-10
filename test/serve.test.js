@@ -127,6 +127,22 @@ test('動画一覧: カテゴリのフォルダにある動画だけを、名前
   assert.deepEqual(plain(ctx.window.HIDD_VIDEO_FILES), EXPECTED);
 });
 
+test('動画一覧: 動画の拡張子を持つフォルダと、その中の動画は拾わない', { skip }, async (t) => {
+  const folders = ['src/videos/ai/03_フォルダ.mp4', 'src/videos/web/空のフォルダ.MOV'];
+  t.after(() => {
+    for (const folder of folders) rmSync(path.join(ROOT, folder), { recursive: true, force: true });
+  });
+  put(folders[0] + '/入れ子の動画.webm');
+  mkdirSync(path.join(ROOT, folders[1]));
+
+  const res = await get('/src/js/videos.js');
+  assert.equal(res.status, 200);
+  const ctx = vm.createContext({ window: {} });
+  vm.runInContext(res.body.toString('utf8'), ctx);
+  // 既存の動画は残り、フォルダしかない web カテゴリも一覧へ追加されない。
+  assert.deepEqual(plain(ctx.window.HIDD_VIDEO_FILES), EXPECTED);
+});
+
 test('動画一覧: 配信した内容を src/js/videos.js にも書き出す（file:// で開いたとき用）', { skip }, async () => {
   const res = await get('/src/js/videos.js?v=1');   // クエリ付きでも同じものを返す
   assert.equal(res.status, 200);
