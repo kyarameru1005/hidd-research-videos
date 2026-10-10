@@ -56,6 +56,7 @@ def scan_videos():
         files = sorted(
             f for f in os.listdir(folder)
             if not f.startswith(".") and f.lower().endswith(VIDEO_EXT)
+            and os.path.isfile(os.path.join(folder, f))
         )
         if files:
             found[name] = files
